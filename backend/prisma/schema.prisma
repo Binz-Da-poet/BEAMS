@@ -1,0 +1,385 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core masters
+model Store {
+  id      BigInt  @id @default(autoincrement())
+  name    String
+  code    String? @unique
+  address String?
+  phone   String?
+  email   String?
+  staff   Staff[]
+  orders  Order[]
+}
+
+model Customer {
+  id     BigInt  @id @default(autoincrement())
+  name   String
+  kana   String?
+  phone  String?
+  email  String?
+  note   String?
+  orders Order[]
+}
+
+model Staff {
+  id      BigInt @id @default(autoincrement())
+  store   Store  @relation(fields: [storeId], references: [id])
+  storeId BigInt
+  name    String
+  email   String?
+  phone   String?
+  role    String?
+  items   OrderItem[]
+}
+
+model Plan {
+  id   Int    @id
+  code String @unique
+  name String
+  orders Order[]
+}
+
+model ItemType {
+  id   Int    @id
+  code String @unique
+  name String
+  items OrderItem[]
+}
+
+model PickupMethod {
+  id   Int    @id
+  code String @unique
+  name String
+  orders Order[]
+}
+
+model OrientationType {
+  id   Int    @id
+  code String @unique
+  name String
+}
+
+// Orders
+model Order {
+  id                         BigInt        @id @default(autoincrement())
+  store                      Store         @relation(fields: [storeId], references: [id])
+  storeId                    BigInt
+  customer                   Customer      @relation(fields: [customerId], references: [id])
+  customerId                 BigInt
+  plan                       Plan          @relation(fields: [planId], references: [id])
+  planId                     Int
+  receptionDate              DateTime
+  expectedStoreArrivalDate   DateTime?
+  pickupMethod               PickupMethod? @relation(fields: [pickupMethodId], references: [id])
+  pickupMethodId             Int?
+  salesPrice                 Decimal?      @db.Decimal(12, 0)
+  orderNo                    String? @unique
+  notes                      String?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+  items                      OrderItem[]
+}
+
+model OrderItem {
+  id               BigInt   @id @default(autoincrement())
+  order            Order    @relation(fields: [orderId], references: [id])
+  orderId          BigInt
+  itemType         ItemType @relation(fields: [itemTypeId], references: [id])
+  itemTypeId       Int
+  staff            Staff?   @relation(fields: [staffId], references: [id])
+  staffId          BigInt?
+  quantity         Int      @default(1)
+  unitPrice        Decimal? @db.Decimal(12, 0)
+  orderPeriodStart DateTime?
+  orderPeriodEnd   DateTime?
+
+  // 1-1 to details models via same id as FK
+  jacketDetails JacketDetails?
+  coatDetails   CoatDetails?
+  suitDetails   SuitDetails?
+  pantsDetails  PantsDetails?
+  vestDetails   VestDetails?
+}
+
+// Jacket
+model JacketDetails {
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId     BigInt         @id
+  fabricNo        String
+  patternNo       String?
+  bodyLiningNo    String?
+  bodyLiningColorNo String?
+  bodyLiningOrientation OrientationType? @relation(fields: [bodyLiningOrientationId], references: [id])
+  bodyLiningOrientationId Int?
+  sleeveLiningNo  String?
+  sleeveLiningColorNo String?
+  sleeveLiningOrientation OrientationType? @relation(fields: [sleeveLiningOrientationId], references: [id])
+  sleeveLiningOrientationId Int?
+  liningSpec      String?
+  buttonNo        String?
+  buttonColorNo   String?
+  optionsText     String?
+  cuffSpec        String?
+  cuffButtonCount Int?
+  cuffButtonStartPos Decimal? @db.Decimal(6, 1)
+  sizeLabel       String?
+  bastedFitting   Boolean?
+  remarks         String?
+  measurements    JacketMeasurement[]
+}
+
+model JacketMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements JacketMeasurement[]
+}
+
+model JacketMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    JacketDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         JacketMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+
+// Coat
+model CoatDetails {
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId     BigInt         @id
+  season          Season?        @relation(fields: [seasonId], references: [id])
+  seasonId        Int?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
+  supplierId      BigInt?
+  fabricNo        String
+  patternNo       String?
+  bodyLiningNo    String?
+  bodyLiningColorNo String?
+  bodyLiningOrientation OrientationType? @relation(fields: [bodyLiningOrientationId], references: [id])
+  bodyLiningOrientationId Int?
+  sleeveLiningNo  String?
+  sleeveLiningColorNo String?
+  sleeveLiningOrientation OrientationType? @relation(fields: [sleeveLiningOrientationId], references: [id])
+  sleeveLiningOrientationId Int?
+  liningSpec      String?
+  buttonNo        String?
+  buttonColorNo   String?
+  optionsText     String?
+  cuffSpec        String?
+  cuffButtonCount Int?
+  cuffButtonStartPos Decimal? @db.Decimal(6, 1)
+  sizeLabel       String?
+  bastedFitting   Boolean?
+  remarks         String?
+  measurements    CoatMeasurement[]
+}
+
+model Season {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+}
+
+model Supplier {
+  id    BigInt @id @default(autoincrement())
+  code  String?
+  name  String
+  contactEmail String?
+  contactPhone String?
+  note   String?
+}
+
+model CoatMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements CoatMeasurement[]
+}
+
+model CoatMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    CoatDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         CoatMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+
+// Suit
+model SuitDetails {
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId     BigInt         @id
+  season          Season?        @relation(fields: [seasonId], references: [id])
+  seasonId        Int?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
+  supplierId      BigInt?
+  fabricNo        String
+  jacketPatternNo String?
+  pantsPatternNo  String?
+  bodyLiningNo    String?
+  bodyLiningColorNo String?
+  bodyLiningOrientation OrientationType? @relation(fields: [bodyLiningOrientationId], references: [id])
+  bodyLiningOrientationId Int?
+  sleeveLiningNo  String?
+  sleeveLiningColorNo String?
+  sleeveLiningOrientation OrientationType? @relation(fields: [sleeveLiningOrientationId], references: [id])
+  sleeveLiningOrientationId Int?
+  liningSpec      String?
+  jacketButtonNo  String?
+  jacketButtonColorNo String?
+  pantsButtonNo   String?
+  pantsButtonColorNo String?
+  cuffSpec        String?
+  cuffButtonCount Int?
+  cuffButtonStartPos Decimal? @db.Decimal(6, 1)
+  jacketSizeLabel String?
+  pantsSizeLabel  String?
+  pantsHemSpec    String?
+  pantsDoubleWidth Decimal? @db.Decimal(5, 1)
+  bastedFitting   Boolean?
+  remarks         String?
+  jacketMeasurements SuitJacketMeasurement[]
+  pantsMeasurements  SuitPantsMeasurement[]
+}
+
+model SuitJacketMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements SuitJacketMeasurement[]
+}
+
+model SuitJacketMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    SuitDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         SuitJacketMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+
+model SuitPantsMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements SuitPantsMeasurement[]
+}
+
+model SuitPantsMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    SuitDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         SuitPantsMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+
+// Pants
+model PantsDetails {
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId     BigInt         @id
+  season          Season?        @relation(fields: [seasonId], references: [id])
+  seasonId        Int?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
+  supplierId      BigInt?
+  fabricNo        String
+  pantsPatternNo  String?
+  liningSpec      String?
+  pantsButtonNo   String?
+  pantsButtonColorNo String?
+  pantsSizeLabel  String?
+  pantsHemSpec    String?
+  pantsDoubleWidth Decimal? @db.Decimal(5, 1)
+  bastedFitting   Boolean?
+  remarks         String?
+  measurements    PantsMeasurement[]
+}
+
+model PantsMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements PantsMeasurement[]
+}
+
+model PantsMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    PantsDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         PantsMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+
+// Vest
+model VestDetails {
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId     BigInt         @id
+  season          Season?        @relation(fields: [seasonId], references: [id])
+  seasonId        Int?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
+  supplierId      BigInt?
+  fabricNo        String
+  patternNo       String?
+  bodyLiningNo    String?
+  bodyLiningColorNo String?
+  bodyLiningOrientation OrientationType? @relation(fields: [bodyLiningOrientationId], references: [id])
+  bodyLiningOrientationId Int?
+  liningSpec      String?
+  buttonNo        String?
+  buttonColorNo   String?
+  sizeLabel       String?
+  bastedFitting   Boolean?
+  remarks         String?
+  measurements    VestMeasurement[]
+}
+
+model VestMeasurementType {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  name  String
+  unit  String?
+  measurements VestMeasurement[]
+}
+
+model VestMeasurement {
+  id           BigInt @id @default(autoincrement())
+  orderItem    VestDetails @relation(fields: [orderItemId], references: [orderItemId])
+  orderItemId  BigInt
+  type         VestMeasurementType @relation(fields: [typeId], references: [id])
+  typeId       Int
+  standardValue Decimal? @db.Decimal(6, 1)
+  adjustValue   Decimal? @db.Decimal(6, 1)
+  finalValue    Decimal? @db.Decimal(6, 1)
+  @@unique([orderItemId, typeId])
+}
+

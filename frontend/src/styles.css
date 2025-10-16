@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App theme shims to approximate existing look */
+:root {
+  --line: #eef0f2;
+}
+
+/* Basic container */
+.container-card {
+  @apply max-w-[1100px] mx-auto my-6 p-5 bg-white border rounded-xl;
+  border-color: var(--line);
+}
