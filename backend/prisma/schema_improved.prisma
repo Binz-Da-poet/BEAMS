@@ -7,27 +7,245 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===== USER MANAGEMENT =====
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  password    String
+  email       String?  @unique
+  phone       String?
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  storeId     Int?
+  store       Store?   @relation(fields: [storeId], references: [id])
+  role        UserRole @default(STAFF)
+  orders      Order[]
+  orderLogs   OrderLog[]
+  notifications Notification[]
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  STORE_MANAGER
+  STORE_STAFF
+  FACTORY_MANAGER
+  FACTORY_STAFF
+}
+
+// ===== ORDER STATUS MANAGEMENT =====
+model OrderStatus {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  color       String?  // For UI display
+  
+  // Relations
+  orders      Order[]
+  orderLogs   OrderLog[]
+  
+  @@map("order_statuses")
+}
+
+// ===== ORDER WORKFLOW TRACKING =====
+model OrderLog {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  userId      Int
+  statusId    Int
+  action      String   // "CREATED", "UPDATED", "STATUS_CHANGED", "PDF_GENERATED"
+  description String?
+  oldValues   Json?    // Store previous values
+  newValues   Json?    // Store new values
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  order       Order      @relation(fields: [orderId], references: [id])
+  user        User       @relation(fields: [userId], references: [id])
+  status      OrderStatus @relation(fields: [statusId], references: [id])
+  
+  @@map("order_logs")
+  @@index([orderId, createdAt])
+  @@index([userId, createdAt])
+  @@index([statusId, createdAt])
+}
+
+// ===== PDF DOCUMENT MANAGEMENT =====
+model Document {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  type        DocumentType
+  fileName    String
+  filePath    String
+  fileSize    Int?
+  generatedAt DateTime @default(now())
+  generatedBy Int      // User ID
+  
+  // Relations
+  order       Order @relation(fields: [orderId], references: [id])
+  
+  @@map("documents")
+  @@index([orderId])
+  @@index([type])
+}
+
+enum DocumentType {
+  FABRIC_ORDER_SHEET    // 生地発注書
+  FACTORY_ORDER_SHEET   // 工場発注書
+  CUSTOMER_ORDER_SHEET  // お客様注文書
+  MEASUREMENT_SHEET     // 採寸表
+}
+
+// ===== NOTIFICATION SYSTEM =====
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  title       String
+  message     String
+  type        NotificationType
+  isRead      Boolean  @default(false)
+  data        Json?    // Additional data
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  
+  // Relations
+  user        User @relation(fields: [userId], references: [id])
+  
+  @@map("notifications")
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_UPDATED
+  ORDER_STATUS_CHANGED
+  PDF_GENERATED
+  SYSTEM_ALERT
+}
+
+// ===== SYSTEM CONFIGURATION =====
+model SystemConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String
+  description String?
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_configs")
+}
+
+// ===== IMPROVED STORE MODEL =====
 model Store {
-  id      Int     @id @default(autoincrement())
-  name    String
-  code    String? @unique
-  address String?
-  phone   String?
-  email   String?
-  orders  Order[]
-  staff   Staff[]
+  id          Int     @id @default(autoincrement())
+  name        String
+  code        String? @unique
+  address     String?
+  phone       String?
+  email       String?
+  
+  // Thêm các field mới
+  isActive    Boolean @default(true)
+  region      String?
+  managerName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  orders      Order[]
+  staff       Staff[]
+  users       User[]
+  
+  @@map("stores")
 }
 
+// ===== IMPROVED CUSTOMER MODEL =====
 model Customer {
-  id     Int     @id @default(autoincrement())
-  name   String
-  kana   String?
-  phone  String?
-  email  String?
-  note   String?
-  orders Order[]
+  id          Int     @id @default(autoincrement())
+  name        String
+  kana        String?
+  phone       String?
+  email       String?
+  note        String?
+  
+  // Thêm các field mới
+  customerCode String? @unique
+  birthDate    DateTime?
+  address      String?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  orders      Order[]
+  
+  @@map("customers")
 }
 
+// ===== IMPROVED ORDER MODEL =====
+model Order {
+  id                       Int           @id @default(autoincrement())
+  storeId                  Int
+  customerId               Int
+  planId                   Int
+  statusId                 Int           @default(1) // Default to first status
+  receptionDate            DateTime
+  expectedStoreArrivalDate DateTime?
+  pickupMethodId           Int?
+  salesPrice               Decimal?
+  orderNo                  String?       @unique
+  notes                    String?
+  
+  // Thêm các field mới
+  priority                 OrderPriority @default(NORMAL)
+  estimatedCompletionDate  DateTime?
+  actualCompletionDate     DateTime?
+  isUrgent                 Boolean       @default(false)
+  internalNotes            String?       // Ghi chú nội bộ
+  
+  // Audit fields
+  createdBy                Int
+  updatedBy                Int?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  
+  // Relations
+  customer                 Customer      @relation(fields: [customerId], references: [id])
+  pickupMethod             PickupMethod? @relation(fields: [pickupMethodId], references: [id])
+  plan                     Plan          @relation(fields: [planId], references: [id])
+  store                    Store         @relation(fields: [storeId], references: [id])
+  status                   OrderStatus   @relation(fields: [statusId], references: [id])
+  items                    OrderItem[]
+  logs                     OrderLog[]
+  documents                Document[]
+  
+  // Indexes for performance
+  @@index([statusId])
+  @@index([storeId])
+  @@index([createdAt])
+  @@index([orderNo])
+  @@index([statusId, createdAt])
+  @@index([storeId, statusId])
+  @@index([customerId, createdAt])
+}
+
+enum OrderPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// ===== EXISTING MODELS (KEEPING EXISTING STRUCTURE) =====
 model Staff {
   id      Int         @id @default(autoincrement())
   storeId Int
@@ -73,26 +291,6 @@ model OrientationType {
   vestBodyLiningOrientations     VestDetails[]   @relation("VestBodyLiningOrientation")
 }
 
-model Order {
-  id                       Int           @id @default(autoincrement())
-  storeId                  Int
-  customerId               Int
-  planId                   Int
-  receptionDate            DateTime
-  expectedStoreArrivalDate DateTime?
-  pickupMethodId           Int?
-  salesPrice               Decimal?
-  orderNo                  String?       @unique
-  notes                    String?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  customer                 Customer      @relation(fields: [customerId], references: [id])
-  pickupMethod             PickupMethod? @relation(fields: [pickupMethodId], references: [id])
-  plan                     Plan          @relation(fields: [planId], references: [id])
-  store                    Store         @relation(fields: [storeId], references: [id])
-  items                    OrderItem[]
-}
-
 model OrderItem {
   id               Int            @id @default(autoincrement())
   orderId          Int
@@ -110,8 +308,13 @@ model OrderItem {
   pantsDetails     PantsDetails?
   suitDetails      SuitDetails?
   vestDetails      VestDetails?
+  
+  @@index([orderId])
+  @@index([itemTypeId])
+  @@index([staffId])
 }
 
+// ===== EXISTING DETAIL MODELS (KEEPING EXISTING STRUCTURE) =====
 model JacketDetails {
   orderItemId               Int                      @id
   fabricId                  Int?
