@@ -7,27 +7,273 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===== USER MANAGEMENT =====
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  password    String  // Should be hashed before storage
+  email       String?  @unique
+  phone       String?
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  storeId     Int?
+  store       Store?   @relation(fields: [storeId], references: [id])
+  roleId      Int?     // FK to MCode with category "USER_ROLE"
+  role        MCode?   @relation("UserRoleCode", fields: [roleId], references: [id])
+  orders      Order[]
+  orderLogs   OrderLog[]
+  notifications Notification[]
+  createdOrders Order[] @relation("OrderCreatedBy")
+  updatedOrders Order[] @relation("OrderUpdatedBy")
+  deletedStores Store[] @relation("StoreDeletedBy")
+  deletedCustomers Customer[] @relation("CustomerDeletedBy")
+  
+  @@map("t_users")
+}
+
+// UserRole moved to MCode table with category "USER_ROLE"
+
+// ===== ORDER STATUS MANAGEMENT =====
+model OrderStatus {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  color       String?  // For UI display
+  
+  // Relations
+  mCodeId     Int?     @map("m_code_id")
+  mCode       MCode?   @relation("OrderStatusCode", fields: [mCodeId], references: [id])
+  orders      Order[]
+  orderLogs   OrderLog[]
+  
+  @@map("t_order_statuses")
+}
+
+// ===== ORDER WORKFLOW TRACKING =====
+model OrderLog {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  userId      Int
+  statusId    Int
+  action      String   // "CREATED", "UPDATED", "STATUS_CHANGED", "PDF_GENERATED"
+  description String?
+  oldValues   Json?    @db.Json // Store previous values (max 1MB)
+  newValues   Json?    @db.Json // Store new values (max 1MB)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  order       Order      @relation(fields: [orderId], references: [id])
+  user        User       @relation(fields: [userId], references: [id])
+  status      OrderStatus @relation(fields: [statusId], references: [id])
+  
+  @@map("t_order_logs")
+  @@index([orderId, createdAt])
+  @@index([userId, createdAt])
+  @@index([statusId, createdAt])
+}
+
+// ===== PDF DOCUMENT MANAGEMENT =====
+model Document {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  typeId      Int
+  type        MCode?   @relation("DocumentTypeCode", fields: [typeId], references: [id])
+  fileName    String
+  filePath    String
+  fileSize    Int?
+  generatedAt DateTime @default(now())
+  generatedBy Int      // User ID
+  
+  // Relations
+  order       Order @relation(fields: [orderId], references: [id])
+  
+  @@map("t_documents")
+  @@index([orderId])
+  @@index([typeId])
+}
+
+// DocumentType moved to MCode table with category "DOCUMENT_TYPE"
+
+// ===== NOTIFICATION SYSTEM =====
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  title       String
+  message     String
+  typeId      Int
+  type        MCode?   @relation("NotificationTypeCode", fields: [typeId], references: [id])
+  isRead      Boolean  @default(false)
+  data        Json?    @db.Json // Additional data (max 1MB)
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  
+  // Relations
+  user        User @relation(fields: [userId], references: [id])
+  
+  @@map("t_notifications")
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// NotificationType moved to MCode table with category "NOTIFICATION_TYPE"
+
+// ===== SYSTEM CONFIGURATION =====
+model SystemConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String
+  description String?
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_configs")
+}
+
+// ===== MASTER CODE MANAGEMENT =====
+model MCode {
+  id          Int      @id @default(autoincrement())
+  category    String   // "ITEM_TYPE", "PLAN", "PICKUP_METHOD", "ORIENTATION", "SEASON", "SUPPLIER", "NOTIFICATION_TYPE", "DOCUMENT_TYPE", "ORDER_PRIORITY", "USER_ROLE"
+  code        String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  metadata    Json?    @db.Json // Additional data for specific codes (max 1MB)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  itemTypes           ItemType[]           @relation("ItemTypeCode")
+  plans               Plan[]               @relation("PlanCode")
+  pickupMethods       PickupMethod[]       @relation("PickupMethodCode")
+  orientationTypes    OrientationType[]    @relation("OrientationTypeCode")
+  seasons             Season[]             @relation("SeasonCode")
+  suppliers           Supplier[]           @relation("SupplierCode")
+  orderStatuses       OrderStatus[]        @relation("OrderStatusCode")
+  documents           Document[]           @relation("DocumentTypeCode")
+  notifications       Notification[]       @relation("NotificationTypeCode")
+  orders              Order[]              @relation("OrderPriorityCode")
+  users               User[]               @relation("UserRoleCode")
+  
+  @@unique([category, code])
+  @@index([category])
+  @@index([isActive])
+  @@map("m_codes")
+}
+
+// ===== ENHANCED STORE MODEL =====
 model Store {
-  id      Int     @id @default(autoincrement())
-  name    String
-  code    String? @unique
-  address String?
-  phone   String?
-  email   String?
-  orders  Order[]
-  staff   Staff[]
+  id          Int     @id @default(autoincrement())
+  name        String
+  code        String? @unique
+  address     String?
+  phone       String?
+  email       String?
+  
+  // Enhanced fields
+  isActive    Boolean @default(true)
+  region      String?
+  managerName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  deletedBy   Int?
+  
+  // Relations
+  orders      Order[]
+  staff       Staff[]
+  users       User[]
+  deletedByUser User? @relation("StoreDeletedBy", fields: [deletedBy], references: [id])
+  
+  @@map("t_stores")
 }
 
+// ===== ENHANCED CUSTOMER MODEL =====
 model Customer {
-  id     Int     @id @default(autoincrement())
-  name   String
-  kana   String?
-  phone  String?
-  email  String?
-  note   String?
-  orders Order[]
+  id          Int     @id @default(autoincrement())
+  name        String
+  kana        String?
+  phone       String?
+  email       String?
+  note        String?
+  
+  // Enhanced fields
+  customerCode String? @unique
+  birthDate    DateTime?
+  address      String?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+  deletedBy    Int?
+  
+  // Relations
+  orders      Order[]
+  deletedByUser User? @relation("CustomerDeletedBy", fields: [deletedBy], references: [id])
+  
+  @@map("t_customers")
 }
 
+// ===== ENHANCED ORDER MODEL =====
+model Order {
+  id                       Int           @id @default(autoincrement())
+  storeId                  Int
+  customerId               Int
+  planId                   Int
+  statusId                 Int           @default(1) // Default to first status
+  receptionDate            DateTime
+  expectedStoreArrivalDate DateTime?
+  pickupMethodId           Int?
+  salesPrice               Decimal?      // Must be >= 0
+  orderNo                  String?       @unique
+  notes                    String?
+  
+  // Enhanced fields
+  priorityId               Int           @default(2) // Default to NORMAL priority
+  priority                 MCode?        @relation("OrderPriorityCode", fields: [priorityId], references: [id])
+  estimatedCompletionDate  DateTime?
+  actualCompletionDate     DateTime?
+  isUrgent                 Boolean       @default(false)
+  internalNotes            String?       // Ghi chú nội bộ
+  
+  // Audit fields
+  createdBy                Int
+  updatedBy                Int?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  
+  // Relations
+  customer                 Customer      @relation(fields: [customerId], references: [id])
+  pickupMethod             PickupMethod? @relation(fields: [pickupMethodId], references: [id])
+  plan                     Plan          @relation(fields: [planId], references: [id])
+  store                    Store         @relation(fields: [storeId], references: [id])
+  status                   OrderStatus   @relation(fields: [statusId], references: [id])
+  createdByUser            User          @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser            User?         @relation("OrderUpdatedBy", fields: [updatedBy], references: [id])
+  items                    OrderItem[]
+  logs                     OrderLog[]
+  documents                Document[]
+  
+  // Indexes for performance
+  @@index([orderNo])
+  @@index([statusId, createdAt])
+  @@index([storeId, statusId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([createdBy, createdAt])
+  @@index([priorityId, createdAt])
+  @@map("t_orders")
+}
+
+// OrderPriority moved to MCode table with category "ORDER_PRIORITY"
+
+// ===== EXISTING MODELS (KEEPING EXISTING STRUCTURE) =====
 model Staff {
   id      Int         @id @default(autoincrement())
   storeId Int
@@ -37,6 +283,8 @@ model Staff {
   role    String?
   items   OrderItem[]
   store   Store       @relation(fields: [storeId], references: [id])
+  
+  @@map("t_staff")
 }
 
 model Plan {
@@ -44,6 +292,10 @@ model Plan {
   code   String  @unique
   name   String
   orders Order[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("PlanCode", fields: [mCodeId], references: [id])
 }
 
 model ItemType {
@@ -51,6 +303,12 @@ model ItemType {
   code  String      @unique
   name  String
   items OrderItem[]
+  patterns PatternMaster[]
+  measurementTypes MeasurementType[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("ItemTypeCode", fields: [mCodeId], references: [id])
 }
 
 model PickupMethod {
@@ -58,6 +316,10 @@ model PickupMethod {
   code   String  @unique
   name   String
   orders Order[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("PickupMethodCode", fields: [mCodeId], references: [id])
 }
 
 model OrientationType {
@@ -71,26 +333,10 @@ model OrientationType {
   suitBodyLiningOrientations     SuitDetails[]   @relation("SuitBodyLiningOrientation")
   suitSleeveLiningOrientations   SuitDetails[]   @relation("SuitSleeveLiningOrientation")
   vestBodyLiningOrientations     VestDetails[]   @relation("VestBodyLiningOrientation")
-}
-
-model Order {
-  id                       Int           @id @default(autoincrement())
-  storeId                  Int
-  customerId               Int
-  planId                   Int
-  receptionDate            DateTime
-  expectedStoreArrivalDate DateTime?
-  pickupMethodId           Int?
-  salesPrice               Decimal?
-  orderNo                  String?       @unique
-  notes                    String?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  customer                 Customer      @relation(fields: [customerId], references: [id])
-  pickupMethod             PickupMethod? @relation(fields: [pickupMethodId], references: [id])
-  plan                     Plan          @relation(fields: [planId], references: [id])
-  store                    Store         @relation(fields: [storeId], references: [id])
-  items                    OrderItem[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("OrientationTypeCode", fields: [mCodeId], references: [id])
 }
 
 model OrderItem {
@@ -98,8 +344,8 @@ model OrderItem {
   orderId          Int
   itemTypeId       Int
   staffId          Int?
-  quantity         Int            @default(1)
-  unitPrice        Decimal?
+  quantity         Int            @default(1) // Must be > 0
+  unitPrice        Decimal?       // Must be >= 0
   orderPeriodStart DateTime?
   orderPeriodEnd   DateTime?
   coatDetails      CoatDetails?
@@ -110,25 +356,25 @@ model OrderItem {
   pantsDetails     PantsDetails?
   suitDetails      SuitDetails?
   vestDetails      VestDetails?
+  
+  @@index([orderId])
+  @@index([itemTypeId])
+  @@index([staffId])
+  @@map("t_order_items")
 }
 
 model JacketDetails {
   orderItemId               Int                      @id
   fabricId                  Int?
-  fabricNo                  String?
   patternId                 Int?
-  patternNo                 String?
   bodyLiningId              Int?
-  bodyLiningNo              String?
   bodyLiningColorNo         String?
   bodyLiningOrientationId   Int?
   sleeveLiningId            Int?
-  sleeveLiningNo            String?
   sleeveLiningColorNo       String?
   sleeveLiningOrientationId Int?
   liningSpec                String?
   buttonId                  Int?
-  buttonNo                  String?
   buttonColorNo             String?
   optionsId                 Int?
   optionsText               String?
@@ -138,37 +384,69 @@ model JacketDetails {
   sizeLabel                 String?
   bastedFitting             Boolean?
   remarks                   String?
+  
+  // Relations to measurements
+  measurements               Measurement[]            @relation("JacketMeasurements")
+  
+  // Relations
   bodyLining                BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientation     OrientationType?         @relation("JacketBodyLiningOrientation", fields: [bodyLiningOrientationId], references: [id])
   button                    HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
   fabric                    HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   options                   OptionMaster?            @relation(fields: [optionsId], references: [id])
   orderItem                 OrderItem                @relation(fields: [orderItemId], references: [id])
-  pattern                   JacketPatternMaster?     @relation(fields: [patternId], references: [id])
+  pattern                   PatternMaster?           @relation(fields: [patternId], references: [id])
   sleeveLining              SleeveLiningMaster?      @relation(fields: [sleeveLiningId], references: [id])
   sleeveLiningOrientation   OrientationType?         @relation("JacketSleeveLiningOrientation", fields: [sleeveLiningOrientationId], references: [id])
-  measurements              JacketMeasurement[]
+  
+  @@map("t_jacket_details")
 }
 
-model JacketMeasurementType {
+// ===== UNIFIED MEASUREMENT TYPE =====
+model MeasurementType {
   id           Int                 @id @default(autoincrement())
+  itemTypeId   Int
   code         String              @unique
   name         String
   unit         String?
-  measurements JacketMeasurement[]
+  isActive     Boolean             @default(true)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  
+  // Relations
+  itemType     ItemType            @relation(fields: [itemTypeId], references: [id])
+  measurements Measurement[]
+  
+  @@index([itemTypeId])
+  @@index([code])
+  @@map("m_measurement_type")
 }
 
-model JacketMeasurement {
-  id            Int                   @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     JacketDetails         @relation(fields: [orderItemId], references: [orderItemId])
-  type          JacketMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
+// ===== UNIFIED MEASUREMENT TABLE =====
+model Measurement {
+  id            Int                 @id @default(autoincrement())
+  detailsId     Int                 // FK to any Details table
+  detailsType   String              // "JACKET", "COAT", "SUIT", "PANTS", "VEST"
+  typeId        Int                 // FK to MeasurementType
+  standardValue Decimal?            @db.Decimal(10,2)
+  adjustValue   Decimal?            @db.Decimal(10,2)
+  finalValue    Decimal?            @db.Decimal(10,2)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  // Relations
+  type          MeasurementType     @relation(fields: [typeId], references: [id])
+  jacketDetails JacketDetails?      @relation("JacketMeasurements", fields: [detailsId], references: [orderItemId], map: "MeasurementJacketDetails")
+  coatDetails   CoatDetails?        @relation("CoatMeasurements", fields: [detailsId], references: [orderItemId], map: "MeasurementCoatDetails")
+  suitDetails   SuitDetails?        @relation("SuitMeasurements", fields: [detailsId], references: [orderItemId], map: "MeasurementSuitDetails")
+  pantsDetails  PantsDetails?       @relation("PantsMeasurements", fields: [detailsId], references: [orderItemId], map: "MeasurementPantsDetails")
+  vestDetails   VestDetails?        @relation("VestMeasurements", fields: [detailsId], references: [orderItemId], map: "MeasurementVestDetails")
+  
+  @@unique([detailsId, detailsType, typeId])
+  @@index([detailsId, detailsType])
+  @@index([typeId])
+  @@map("t_measurements")
 }
 
 model CoatDetails {
@@ -176,20 +454,15 @@ model CoatDetails {
   seasonId                  Int?
   supplierId                Int?
   fabricId                  Int?
-  fabricNo                  String?
   patternId                 Int?
-  patternNo                 String?
   bodyLiningId              Int?
-  bodyLiningNo              String?
   bodyLiningColorNo         String?
   bodyLiningOrientationId   Int?
   sleeveLiningId            Int?
-  sleeveLiningNo            String?
   sleeveLiningColorNo       String?
   sleeveLiningOrientationId Int?
   liningSpec                String?
   buttonId                  Int?
-  buttonNo                  String?
   buttonColorNo             String?
   optionsId                 Int?
   optionsText               String?
@@ -199,18 +472,24 @@ model CoatDetails {
   sizeLabel                 String?
   bastedFitting             Boolean?
   remarks                   String?
+  
+  // Relations to measurements
+  measurements               Measurement[]            @relation("CoatMeasurements")
+  
+  // Relations
   bodyLining                BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientation     OrientationType?         @relation("CoatBodyLiningOrientation", fields: [bodyLiningOrientationId], references: [id])
   button                    HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
   fabric                    HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   options                   OptionMaster?            @relation(fields: [optionsId], references: [id])
   orderItem                 OrderItem                @relation(fields: [orderItemId], references: [id])
-  pattern                   CoatPatternMaster?       @relation(fields: [patternId], references: [id])
+  pattern                   PatternMaster?           @relation(fields: [patternId], references: [id])
   season                    Season?                  @relation(fields: [seasonId], references: [id])
   sleeveLining              SleeveLiningMaster?      @relation(fields: [sleeveLiningId], references: [id])
   sleeveLiningOrientation   OrientationType?         @relation("CoatSleeveLiningOrientation", fields: [sleeveLiningOrientationId], references: [id])
   supplier                  Supplier?                @relation(fields: [supplierId], references: [id])
-  measurements              CoatMeasurement[]
+  
+  @@map("t_coat_details")
 }
 
 model Season {
@@ -221,6 +500,10 @@ model Season {
   pantsDetails PantsDetails[]
   suitDetails  SuitDetails[]
   vestDetails  VestDetails[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("SeasonCode", fields: [mCodeId], references: [id])
 }
 
 model Supplier {
@@ -235,6 +518,10 @@ model Supplier {
   pantsDetails       PantsDetails[]
   suitDetails        SuitDetails[]
   vestDetails        VestDetails[]
+  
+  // Relations
+  mCodeId Int?   @map("m_code_id")
+  mCode   MCode? @relation("SupplierCode", fields: [mCodeId], references: [id])
 }
 
 model HeavyFabricMaster {
@@ -255,16 +542,31 @@ model HeavyFabricMaster {
   transparent            Boolean?
   stockFlag              Boolean?
   supplierId             Int?
+  
+  // Audit fields
+  createdBy              Int?
+  updatedBy              Int?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  
+  // Relations
   coatDetails            CoatDetails[]
   supplier               Supplier?       @relation(fields: [supplierId], references: [id])
   jacketDetails          JacketDetails[]
   pantsDetails           PantsDetails[]
   suitDetails            SuitDetails[]
   vestDetails            VestDetails[]
+  
+  @@index([fabricNo])
+  @@index([supplierId])
+  @@index([createdAt])
+  @@map("m_heavy_fabric")
 }
 
-model JacketPatternMaster {
+// ===== UNIFIED PATTERN MASTER =====
+model PatternMaster {
   id                 Int             @id @default(autoincrement())
+  itemTypeId         Int
   patternNo          String          @unique
   size               String?
   length             Decimal?
@@ -275,73 +577,33 @@ model JacketPatternMaster {
   sleeveLength       Decimal?
   sleeveWidth        Decimal?
   lapelWidth         Decimal?
+  crotchWidth        Decimal?        // For pants
+  kneeWidth          Decimal?        // For pants
+  hemWidth           Decimal?        // For pants
+  rise               Decimal?        // For pants
+  inseam             Decimal?        // For pants
   stitchSpec         String?
   liningSpec         String?
   defaultButtonCount Int?
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  
+  // Relations
+  itemType           ItemType        @relation(fields: [itemTypeId], references: [id])
   jacketDetails      JacketDetails[]
-}
-
-model SuitPatternMaster {
-  id                 Int           @id @default(autoincrement())
-  patternNo          String        @unique
-  size               String?
-  length             Decimal?
-  shoulderWidth      Decimal?
-  bust               Decimal?
-  waist              Decimal?
-  hip                Decimal?
-  sleeveLength       Decimal?
-  sleeveWidth        Decimal?
-  lapelWidth         Decimal?
-  stitchSpec         String?
-  defaultButtonCount Int?
-  suitDetails        SuitDetails[]
-}
-
-model VestPatternMaster {
-  id                 Int           @id @default(autoincrement())
-  patternNo          String        @unique
-  size               String?
-  length             Decimal?
-  shoulderWidth      Decimal?
-  bust               Decimal?
-  waist              Decimal?
-  stitchSpec         String?
-  defaultButtonCount Int?
+  coatDetails        CoatDetails[]
+  suitJacketDetails  SuitDetails[]   @relation("SuitJacketPattern")
+  suitPantsDetails   SuitDetails[]   @relation("SuitPantsPattern")
   vestDetails        VestDetails[]
+  pantsDetails       PantsDetails[]
+  
+  @@index([itemTypeId])
+  @@index([patternNo])
+  @@map("m_pattern")
 }
 
-model CoatPatternMaster {
-  id            Int           @id @default(autoincrement())
-  patternNo     String        @unique
-  size          String?
-  length        Decimal?
-  shoulderWidth Decimal?
-  bust          Decimal?
-  waist         Decimal?
-  hip           Decimal?
-  sleeveLength  Decimal?
-  sleeveWidth   Decimal?
-  lapelWidth    Decimal?
-  stitchSpec    String?
-  coatDetails   CoatDetails[]
-}
-
-model PantsPatternMaster {
-  id           Int            @id @default(autoincrement())
-  patternNo    String         @unique
-  size         String?
-  waist        Decimal?
-  hip          Decimal?
-  crotchWidth  Decimal?
-  kneeWidth    Decimal?
-  hemWidth     Decimal?
-  rise         Decimal?
-  inseam       Decimal?
-  stitchSpec   String?
-  pantsDetails PantsDetails[]
-  suitDetails  SuitDetails[]
-}
+// Legacy Pattern Master tables removed - use unified PatternMaster instead
 
 model BodyLiningMaster {
   id            Int             @id @default(autoincrement())
@@ -353,6 +615,8 @@ model BodyLiningMaster {
   jacketDetails JacketDetails[]
   suitDetails   SuitDetails[]
   vestDetails   VestDetails[]
+  
+  @@map("m_body_lining")
 }
 
 model SleeveLiningMaster {
@@ -364,6 +628,8 @@ model SleeveLiningMaster {
   coatDetails   CoatDetails[]
   jacketDetails JacketDetails[]
   suitDetails   SuitDetails[]
+  
+  @@map("m_sleeve_lining")
 }
 
 model HeavyFabricButtonMaster {
@@ -394,6 +660,8 @@ model HeavyFabricButtonMaster {
   suitJacketDetails SuitDetails[]   @relation("SuitJacketButton")
   suitPantsDetails  SuitDetails[]   @relation("SuitPantsButton")
   vestDetails       VestDetails[]
+  
+  @@map("m_heavy_fabric_button")
 }
 
 model OptionMaster {
@@ -407,27 +675,8 @@ model OptionMaster {
   pantsDetails  PantsDetails[]
   suitDetails   SuitDetails[]
   vestDetails   VestDetails[]
-}
-
-model CoatMeasurementType {
-  id           Int               @id @default(autoincrement())
-  code         String            @unique
-  name         String
-  unit         String?
-  measurements CoatMeasurement[]
-}
-
-model CoatMeasurement {
-  id            Int                 @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     CoatDetails         @relation(fields: [orderItemId], references: [orderItemId])
-  type          CoatMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
+  
+  @@map("m_option")
 }
 
 model SuitDetails {
@@ -435,25 +684,18 @@ model SuitDetails {
   seasonId                  Int?
   supplierId                Int?
   fabricId                  Int?
-  fabricNo                  String?
   jacketPatternId           Int?
-  jacketPatternNo           String?
   pantsPatternId            Int?
-  pantsPatternNo            String?
   bodyLiningId              Int?
-  bodyLiningNo              String?
   bodyLiningColorNo         String?
   bodyLiningOrientationId   Int?
   sleeveLiningId            Int?
-  sleeveLiningNo            String?
   sleeveLiningColorNo       String?
   sleeveLiningOrientationId Int?
   liningSpec                String?
   jacketButtonId            Int?
-  jacketButtonNo            String?
   jacketButtonColorNo       String?
   pantsButtonId             Int?
-  pantsButtonNo             String?
   pantsButtonColorNo        String?
   optionsId                 Int?
   cuffSpec                  String?
@@ -465,63 +707,26 @@ model SuitDetails {
   pantsDoubleWidth          Decimal?
   bastedFitting             Boolean?
   remarks                   String?
+  
+  // Relations to measurements
+  measurements               Measurement[]            @relation("SuitMeasurements")
+  
+  // Relations
   bodyLining                BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientation     OrientationType?         @relation("SuitBodyLiningOrientation", fields: [bodyLiningOrientationId], references: [id])
   fabric                    HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   jacketButton              HeavyFabricButtonMaster? @relation("SuitJacketButton", fields: [jacketButtonId], references: [id])
-  jacketPattern             SuitPatternMaster?       @relation(fields: [jacketPatternId], references: [id])
+  jacketPattern             PatternMaster?           @relation("SuitJacketPattern", fields: [jacketPatternId], references: [id])
   options                   OptionMaster?            @relation(fields: [optionsId], references: [id])
   orderItem                 OrderItem                @relation(fields: [orderItemId], references: [id])
   pantsButton               HeavyFabricButtonMaster? @relation("SuitPantsButton", fields: [pantsButtonId], references: [id])
-  pantsPattern              PantsPatternMaster?      @relation(fields: [pantsPatternId], references: [id])
+  pantsPattern              PatternMaster?           @relation("SuitPantsPattern", fields: [pantsPatternId], references: [id])
   season                    Season?                  @relation(fields: [seasonId], references: [id])
   sleeveLining              SleeveLiningMaster?      @relation(fields: [sleeveLiningId], references: [id])
   sleeveLiningOrientation   OrientationType?         @relation("SuitSleeveLiningOrientation", fields: [sleeveLiningOrientationId], references: [id])
   supplier                  Supplier?                @relation(fields: [supplierId], references: [id])
-  jacketMeasurements        SuitJacketMeasurement[]
-  pantsMeasurements         SuitPantsMeasurement[]
-}
-
-model SuitJacketMeasurementType {
-  id           Int                     @id @default(autoincrement())
-  code         String                  @unique
-  name         String
-  unit         String?
-  measurements SuitJacketMeasurement[]
-}
-
-model SuitJacketMeasurement {
-  id            Int                       @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     SuitDetails               @relation(fields: [orderItemId], references: [orderItemId])
-  type          SuitJacketMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
-}
-
-model SuitPantsMeasurementType {
-  id           Int                    @id @default(autoincrement())
-  code         String                 @unique
-  name         String
-  unit         String?
-  measurements SuitPantsMeasurement[]
-}
-
-model SuitPantsMeasurement {
-  id            Int                      @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     SuitDetails              @relation(fields: [orderItemId], references: [orderItemId])
-  type          SuitPantsMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
+  
+  @@map("t_suit_details")
 }
 
 model PantsDetails {
@@ -529,12 +734,9 @@ model PantsDetails {
   seasonId           Int?
   supplierId         Int?
   fabricId           Int?
-  fabricNo           String?
   patternId          Int?
-  pantsPatternNo     String?
   liningSpec         String?
   buttonId           Int?
-  pantsButtonNo      String?
   pantsButtonColorNo String?
   optionsId          Int?
   pantsSizeLabel     String?
@@ -542,35 +744,20 @@ model PantsDetails {
   pantsDoubleWidth   Decimal?
   bastedFitting      Boolean?
   remarks            String?
+  
+  // Relations to measurements
+  measurements        Measurement[]            @relation("PantsMeasurements")
+  
+  // Relations
   button             HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
   fabric             HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   options            OptionMaster?            @relation(fields: [optionsId], references: [id])
   orderItem          OrderItem                @relation(fields: [orderItemId], references: [id])
-  pattern            PantsPatternMaster?      @relation(fields: [patternId], references: [id])
+  pattern            PatternMaster?           @relation(fields: [patternId], references: [id])
   season             Season?                  @relation(fields: [seasonId], references: [id])
   supplier           Supplier?                @relation(fields: [supplierId], references: [id])
-  measurements       PantsMeasurement[]
-}
-
-model PantsMeasurementType {
-  id           Int                @id @default(autoincrement())
-  code         String             @unique
-  name         String
-  unit         String?
-  measurements PantsMeasurement[]
-}
-
-model PantsMeasurement {
-  id            Int                  @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     PantsDetails         @relation(fields: [orderItemId], references: [orderItemId])
-  type          PantsMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
+  
+  @@map("t_pants_details")
 }
 
 model VestDetails {
@@ -578,50 +765,33 @@ model VestDetails {
   seasonId                Int?
   supplierId              Int?
   fabricId                Int?
-  fabricNo                String?
   patternId               Int?
-  patternNo               String?
   bodyLiningId            Int?
-  bodyLiningNo            String?
   bodyLiningColorNo       String?
   bodyLiningOrientationId Int?
   liningSpec              String?
   buttonId                Int?
-  buttonNo                String?
   buttonColorNo           String?
   optionsId               Int?
   sizeLabel               String?
   bastedFitting           Boolean?
   remarks                 String?
+  
+  // Relations to measurements
+  measurements            Measurement[]            @relation("VestMeasurements")
+  
+  // Relations
   bodyLining              BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientation   OrientationType?         @relation("VestBodyLiningOrientation", fields: [bodyLiningOrientationId], references: [id])
   button                  HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
   fabric                  HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   options                 OptionMaster?            @relation(fields: [optionsId], references: [id])
   orderItem               OrderItem                @relation(fields: [orderItemId], references: [id])
-  pattern                 VestPatternMaster?       @relation(fields: [patternId], references: [id])
+  pattern                 PatternMaster?           @relation(fields: [patternId], references: [id])
   season                  Season?                  @relation(fields: [seasonId], references: [id])
   supplier                Supplier?                @relation(fields: [supplierId], references: [id])
-  measurements            VestMeasurement[]
+  
+  @@map("t_vest_details")
 }
 
-model VestMeasurementType {
-  id           Int               @id @default(autoincrement())
-  code         String            @unique
-  name         String
-  unit         String?
-  measurements VestMeasurement[]
-}
 
-model VestMeasurement {
-  id            Int                 @id @default(autoincrement())
-  orderItemId   Int
-  typeId        Int
-  standardValue Decimal?
-  adjustValue   Decimal?
-  finalValue    Decimal?
-  orderItem     VestDetails         @relation(fields: [orderItemId], references: [orderItemId])
-  type          VestMeasurementType @relation(fields: [typeId], references: [id])
-
-  @@unique([orderItemId, typeId])
-}
