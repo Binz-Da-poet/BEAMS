@@ -11,39 +11,32 @@ async function seedMCodes() {
   // MCodeデータを挿入
   const mCodes = [
     // アイテムタイプ
-    { category: 'ITEM_TYPE', code: '1', name: 'ジャケット', description: 'ジャケット', sortOrder: 1 },
-    { category: 'ITEM_TYPE', code: '2', name: 'ベスト', description: 'ベスト', sortOrder: 2 },
-    { category: 'ITEM_TYPE', code: '3', name: 'コート', description: 'コート', sortOrder: 3 },
-    { category: 'ITEM_TYPE', code: '4', name: 'パンツ', description: 'パンツ', sortOrder: 4 },
-    { category: 'ITEM_TYPE', code: '5', name: 'スーツ', description: 'スーツ', sortOrder: 5 },
+    { category: 'ITEM_TYPE', code: 'JACKET', name: 'ジャケット', description: 'ジャケット', sortOrder: 1 },
+    { category: 'ITEM_TYPE', code: 'VEST', name: 'ベスト', description: 'ベスト', sortOrder: 2 },
+    { category: 'ITEM_TYPE', code: 'COAT', name: 'コート', description: 'コート', sortOrder: 3 },
+    { category: 'ITEM_TYPE', code: 'PANTS', name: 'パンツ', description: 'パンツ', sortOrder: 4 },
+    { category: 'ITEM_TYPE', code: 'SUIT', name: 'スーツ', description: 'スーツ', sortOrder: 5 },
 
     // プラン
-    { category: 'PLAN', code: '1', name: 'プラン1', description: 'プラン1', sortOrder: 1 },
-    { category: 'PLAN', code: '2', name: 'プラン2', description: 'プラン2', sortOrder: 2 },
-    { category: 'PLAN', code: '3', name: 'プラン3', description: 'プラン3', sortOrder: 3 },
+    { category: 'PLAN', code: '01', name: 'パターンオーダー 基本', description: 'パターンオーダー 基本', sortOrder: 1 },
+    { category: 'PLAN', code: '02', name: 'フルオーダー', description: 'フルオーダー', sortOrder: 2 },
+    { category: 'PLAN', code: '03', name: 'ベーシックオーダー', description: 'ベーシックオーダープラン', sortOrder: 3 },
+    { category: 'PLAN', code: '04', name: 'カスタムオーダー', description: 'カスタムオーダープラン', sortOrder: 4 },
+    { category: 'PLAN', code: '05', name: 'フルオーダー', description: 'フルオーダー', sortOrder: 5 },
 
     // 受取方法
-    { category: 'PICKUP_METHOD', code: '1', name: '来店受取', description: '来店での受取', sortOrder: 1 },
-    { category: 'PICKUP_METHOD', code: '2', name: '配送', description: '配送での配送', sortOrder: 2 },
-
-    // 向きタイプ
-    { category: 'ORIENTATION', code: '1', name: '通常', description: '通常の向き', sortOrder: 1 },
-    { category: 'ORIENTATION', code: '2', name: '逆', description: '逆の向き', sortOrder: 2 },
+    { category: 'PICKUP_METHOD', code: 'STORE', name: 'ご来店', description: '来店での受取', sortOrder: 1 },
+    { category: 'PICKUP_METHOD', code: 'DELIVERY', name: '配送', description: '配送での受取', sortOrder: 2 },
 
     // シーズン
-    { category: 'SEASON', code: '1', name: '春夏', description: '春夏シーズン', sortOrder: 1 },
-    { category: 'SEASON', code: '2', name: '秋冬', description: '秋冬シーズン', sortOrder: 2 },
+    { category: 'SEASON', code: '1', name: 'SS重衣料', description: 'SS重衣料', sortOrder: 1 },
+    { category: 'SEASON', code: '3', name: 'AW重衣料', description: 'AW重衣料', sortOrder: 2 },
+    { category: 'SEASON', code: '5', name: 'SSシャツ', description: 'SSシャツ', sortOrder: 3 },
+    { category: 'SEASON', code: '7', name: 'AWシャツ', description: 'AWシャツ', sortOrder: 4 },
 
-    // 注文優先度
-    { category: 'ORDER_PRIORITY', code: 'LOW', name: '低', description: '低優先度', sortOrder: 1 },
-    { category: 'ORDER_PRIORITY', code: 'NORMAL', name: '通常', description: '通常優先度', sortOrder: 2 },
-    { category: 'ORDER_PRIORITY', code: 'HIGH', name: '高', description: '高優先度', sortOrder: 3 },
-    { category: 'ORDER_PRIORITY', code: 'URGENT', name: '緊急', description: '緊急優先度', sortOrder: 4 },
-
-    // ユーザーロール
-    { category: 'USER_ROLE', code: 'ADMIN', name: '管理者', description: 'システム管理者', sortOrder: 1 },
-    { category: 'USER_ROLE', code: 'STORE', name: '店舗', description: '店舗で受注対応を行うユーザー', sortOrder: 2 },
-    { category: 'USER_ROLE', code: 'FACTORY_STAFF', name: '工場', description: '工場で受注処理を行うユーザー', sortOrder: 3 },
+    // 向きタイプ
+    { category: 'ORIENTATION', code: 'NORMAL', name: '正', description: '正方向', sortOrder: 1 },
+    { category: 'ORIENTATION', code: 'REVERSE', name: '逆', description: '逆方向', sortOrder: 2 },
 
     // 通知タイプ
     { category: 'NOTIFICATION_TYPE', code: 'ORDER_CREATED', name: '注文作成', description: '注文が作成されました', sortOrder: 1 },

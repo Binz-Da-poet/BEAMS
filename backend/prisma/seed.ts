@@ -6,6 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting unified seed...');
 
+  // ===== Seed MCode trước nếu chưa có =====
+  const mCodeCount = await prisma.mCode.count();
+  if (mCodeCount === 0) {
+    console.log('📋 Seeding MCode data first...');
+    const { seedMCodes } = await import('./seed-m-codes');
+    await seedMCodes();
+  }
   // ===== 注文ステータスを作成 =====
   console.log('📊 Creating order statuses...');
   const orderStatuses = await Promise.all([
@@ -136,18 +143,6 @@ async function main() {
   const hashedPasswordFactory = await bcrypt.hash('1111', 10);
   const hashedPasswordAdmin = await bcrypt.hash('ADMIN', 10);
 
-  const userRoles = await prisma.mCode.findMany({
-    where: { category: 'USER_ROLE', code: { in: ['ADMIN', 'STORE', 'FACTORY_STAFF'] } },
-  });
-  const roleMap = userRoles.reduce<Record<string, number>>((acc, role) => {
-    acc[role.code] = role.id;
-    return acc;
-  }, {});
-
-  if (!roleMap.ADMIN || !roleMap.STORE || !roleMap.FACTORY_STAFF) {
-    throw new Error('USER_ROLE codes (ADMIN, STORE, FACTORY_STAFF) are required. Please run seed-m-codes.ts first.');
-  }
-
   const users = await Promise.all([
     // 店舗ユーザー: ユーザー名 "001", パスワード "1111"
     prisma.user.upsert({
@@ -158,7 +153,7 @@ async function main() {
         password: hashedPasswordStore,
         email: 'store@beams.co.jp',
         phone: '03-3354-1234',
-        roleId: roleMap.STORE,
+        role: 'STORE' as any,
         storeId: stores[0].id,
         isActive: true,
       },
@@ -172,7 +167,7 @@ async function main() {
         password: hashedPasswordFactory,
         email: 'factory@beams.co.jp',
         phone: '03-9876-5432',
-        roleId: roleMap.FACTORY_STAFF,
+        role: 'FACTORY_STAFF' as any,
         isActive: true,
       },
     }),
@@ -185,7 +180,7 @@ async function main() {
         password: hashedPasswordAdmin,
         email: 'admin@beams.co.jp',
         phone: '03-1234-5678',
-        roleId: roleMap.ADMIN,
+        role: 'ADMIN' as any,
         isActive: true,
       },
     }),
@@ -238,161 +233,90 @@ async function main() {
     }),
   ]);
 
-  // ===== プランを作成 =====
-  console.log('📋 Creating plans...');
-  const plans = await Promise.all([
-    prisma.plan.upsert({
-      where: { code: 'BASIC' },
-      update: {},
-      create: {
-        id: 1,
-        code: 'BASIC',
-        name: 'ベーシックオーダー',
-      },
-    }),
-    prisma.plan.upsert({
-      where: { code: 'CUSTOM' },
-      update: {},
-      create: {
-        id: 2,
-        code: 'CUSTOM',
-        name: 'カスタムオーダー',
-      },
-    }),
-    prisma.plan.upsert({
-      where: { code: 'FULL' },
-      update: {},
-      create: {
-        id: 3,
-        code: 'FULL',
-        name: 'フルオーダー',
-      },
-    }),
-  ]);
+  // ===== MCode lookups =====
+  const planCodeMap = Object.fromEntries(
+    (
+      await prisma.mCode.findMany({
+        where: { category: 'PLAN' },
+      })
+    ).map((m) => [m.code, m.id]),
+  );
 
-  // ===== アイテムタイプを作成 =====
-  console.log('👔 Creating item types...');
-  const itemTypes = await Promise.all([
-    prisma.itemType.upsert({
-      where: { code: 'JACKET' },
-      update: {},
-      create: {
-        id: 1,
-        code: 'JACKET',
-        name: 'ジャケット',
-      },
-    }),
-    prisma.itemType.upsert({
-      where: { code: 'COAT' },
-      update: {},
-      create: {
-        id: 2,
-        code: 'COAT',
-        name: 'コート',
-      },
-    }),
-    prisma.itemType.upsert({
-      where: { code: 'SUIT' },
-      update: {},
-      create: {
-        id: 3,
-        code: 'SUIT',
-        name: 'スーツ',
-      },
-    }),
-    prisma.itemType.upsert({
-      where: { code: 'PANTS' },
-      update: {},
-      create: {
-        id: 4,
-        code: 'PANTS',
-        name: 'パンツ',
-      },
-    }),
-    prisma.itemType.upsert({
-      where: { code: 'VEST' },
-      update: {},
-      create: {
-        id: 5,
-        code: 'VEST',
-        name: 'ベスト',
-      },
-    }),
-  ]);
+  const itemTypeCodeMap = Object.fromEntries(
+    (
+      await prisma.mCode.findMany({
+        where: { category: 'ITEM_TYPE', code: { in: ['JACKET', 'COAT', 'SUIT', 'PANTS', 'VEST'] } },
+      })
+    ).map((m) => [m.code, m.id]),
+  );
 
-  // ===== 受取方法を作成 =====
-  console.log('🚚 Creating pickup methods...');
-  const pickupMethods = await Promise.all([
-    prisma.pickupMethod.upsert({
-      where: { code: 'STORE' },
-      update: {},
-      create: {
-        id: 1,
-        code: 'STORE',
-        name: '店舗受取',
-      },
-    }),
-    prisma.pickupMethod.upsert({
-      where: { code: 'DELIVERY' },
-      update: {},
-      create: {
-        id: 2,
-        code: 'DELIVERY',
-        name: '配送',
-      },
-    }),
-  ]);
+  const pickupMethodCodeMap = Object.fromEntries(
+    (
+      await prisma.mCode.findMany({
+        where: { category: 'PICKUP_METHOD', code: { in: ['STORE', 'DELIVERY'] } },
+      })
+    ).map((m) => [m.code, m.id]),
+  );
 
-  // ===== 向きタイプを作成 =====
-  console.log('🧭 Creating orientation types...');
-  const orientationTypes = await Promise.all([
-    prisma.orientationType.upsert({
-      where: { code: 'NORMAL' },
-      update: {},
-      create: {
-        id: 1,
-        code: 'NORMAL',
-        name: '正',
-      },
-    }),
-    prisma.orientationType.upsert({
-      where: { code: 'REVERSE' },
-      update: {},
-      create: {
-        id: 2,
-        code: 'REVERSE',
-        name: '逆',
-      },
-    }),
-  ]);
+  const orientationCodeMap = Object.fromEntries(
+    (
+      await prisma.mCode.findMany({
+        where: { category: 'ORIENTATION', code: { in: ['NORMAL', 'REVERSE'] } },
+      })
+    ).map((m) => [m.code, m.id]),
+  );
 
-  // ===== 仕入先を作成 =====
+  const requireCode = (map: Record<string, number>, code: string, category: string) => {
+    const id = map[code];
+    if (!id) {
+      throw new Error(`Missing ${category} code: ${code}`);
+    }
+    return id;
+  };
+
+  // ===== 仕入先（新マスタ）を作成 =====
   console.log('🏭 Creating suppliers...');
   const suppliers = await Promise.all([
     prisma.supplier.upsert({
-      where: { id: 1 },
-      update: {},
-      create: {
-        id: 1,
-        code: 'SUP001',
-        name: 'サンプル仕入先1',
-        contactEmail: 'supplier1@example.com',
-        contactPhone: '03-1234-5678',
-        note: '高品質な生地を提供',
+      where: { supplierNo: 'SUP001' },
+      update: {
+        supplierName: 'サンプル仕入先1',
+        supplierZipCode: '100-0001',
+        supplierAddress: '東京都千代田区千代田1-1',
+        manager: '佐藤太郎',
+        email1: 'supplier1@example.com',
+        email2: 'supplier1-support@example.com',
       },
-    }),
+      create: {
+        supplierNo: 'SUP001',
+        supplierName: 'サンプル仕入先1',
+        supplierZipCode: '100-0001',
+        supplierAddress: '東京都千代田区千代田1-1',
+        manager: '佐藤太郎',
+        email1: 'supplier1@example.com',
+        email2: 'supplier1-support@example.com',
+      },
+    } as any),
     prisma.supplier.upsert({
-      where: { id: 2 },
-      update: {},
-      create: {
-        id: 2,
-        code: 'SUP002',
-        name: 'サンプル仕入先2',
-        contactEmail: 'supplier2@example.com',
-        contactPhone: '03-2345-6789',
-        note: 'カスタム仕様対応可能',
+      where: { supplierNo: 'SUP002' },
+      update: {
+        supplierName: 'サンプル仕入先2',
+        supplierZipCode: '150-0001',
+        supplierAddress: '東京都渋谷区神宮前1-1-1',
+        manager: '鈴木花子',
+        email1: 'supplier2@example.com',
+        email2: 'supplier2-support@example.com',
       },
-    }),
+      create: {
+        supplierNo: 'SUP002',
+        supplierName: 'サンプル仕入先2',
+        supplierZipCode: '150-0001',
+        supplierAddress: '東京都渋谷区神宮前1-1-1',
+        manager: '鈴木花子',
+        email1: 'supplier2@example.com',
+        email2: 'supplier2-support@example.com',
+      },
+    } as any),
   ]);
 
   // ===== 重厚生地マスタを作成 =====
@@ -403,7 +327,6 @@ async function main() {
       update: {},
       create: {
         fabricNo: 'FAB001',
-        supplierNo: 'SUP001',
         fabricMaker: 'サンプルメーカー1',
         color: 'ネイビー',
         pattern: '無地',
@@ -417,7 +340,7 @@ async function main() {
         largePattern: false,
         transparent: false,
         stockFlag: true,
-        supplierId: 1,
+        supplierId: suppliers[0].id,
       },
     }),
     prisma.heavyFabricMaster.upsert({
@@ -425,7 +348,6 @@ async function main() {
       update: {},
       create: {
         fabricNo: 'FAB002',
-        supplierNo: 'SUP001',
         fabricMaker: 'サンプルメーカー1',
         color: 'グレー',
         pattern: 'ストライプ',
@@ -439,7 +361,7 @@ async function main() {
         largePattern: false,
         transparent: false,
         stockFlag: true,
-        supplierId: 1,
+        supplierId: suppliers[0].id,
       },
     }),
   ]);
@@ -452,7 +374,7 @@ async function main() {
     where: { patternNo: 'JKT001' },
     update: {},
     create: {
-      itemTypeId: itemTypes[0].id, // ジャケット
+      itemTypeCodeId: requireCode(itemTypeCodeMap, 'JACKET', 'ITEM_TYPE'),
       patternNo: 'JKT001',
       size: 'M',
       length: 70.0,
@@ -466,7 +388,7 @@ async function main() {
       stitchSpec: 'ステッチ仕様1',
       liningSpec: '裏仕様1',
       defaultButtonCount: 3,
-    },
+    } as any,
   });
 
   // スーツパターン
@@ -474,7 +396,7 @@ async function main() {
     where: { patternNo: 'SUIT001' },
     update: {},
     create: {
-      itemTypeId: itemTypes[2].id, // スーツ
+      itemTypeCodeId: requireCode(itemTypeCodeMap, 'SUIT', 'ITEM_TYPE'),
       patternNo: 'SUIT001',
       size: 'M',
       length: 70.0,
@@ -487,7 +409,7 @@ async function main() {
       lapelWidth: 8.0,
       stitchSpec: 'ステッチ仕様1',
       defaultButtonCount: 3,
-    },
+    } as any,
   });
 
   // ベストパターン
@@ -495,7 +417,7 @@ async function main() {
     where: { patternNo: 'VEST001' },
     update: {},
     create: {
-      itemTypeId: itemTypes[4].id, // ベスト
+      itemTypeCodeId: requireCode(itemTypeCodeMap, 'VEST', 'ITEM_TYPE'),
       patternNo: 'VEST001',
       size: 'M',
       length: 65.0,
@@ -504,7 +426,7 @@ async function main() {
       waist: 90.0,
       stitchSpec: 'ステッチ仕様1',
       defaultButtonCount: 5,
-    },
+    } as any,
   });
 
   // コートパターン
@@ -512,7 +434,7 @@ async function main() {
     where: { patternNo: 'COAT001' },
     update: {},
     create: {
-      itemTypeId: itemTypes[1].id, // コート
+      itemTypeCodeId: requireCode(itemTypeCodeMap, 'COAT', 'ITEM_TYPE'),
       patternNo: 'COAT001',
       size: 'M',
       length: 110.0,
@@ -524,7 +446,7 @@ async function main() {
       sleeveWidth: 18.0,
       lapelWidth: 10.0,
       stitchSpec: 'ステッチ仕様1',
-    },
+    } as any,
   });
 
   // パンツパターン
@@ -532,7 +454,7 @@ async function main() {
     where: { patternNo: 'PANTS001' },
     update: {},
     create: {
-      itemTypeId: itemTypes[3].id, // パンツ
+      itemTypeCodeId: requireCode(itemTypeCodeMap, 'PANTS', 'ITEM_TYPE'),
       patternNo: 'PANTS001',
       size: 'M',
       waist: 85.0,
@@ -543,7 +465,7 @@ async function main() {
       rise: 28.0,
       inseam: 80.0,
       stitchSpec: 'ステッチ仕様1',
-    },
+    } as any,
   });
 
   // ===== 裏地マスタを作成 =====
@@ -638,73 +560,66 @@ async function main() {
       data: {
         storeId: stores[0].id,
         customerId: customers[0].id,
-        planId: plans[0].id,
+        planCodeId: requireCode(planCodeMap, '03', 'PLAN'),
         statusId: orderStatuses[1].id, // 受付済み
         receptionDate: new Date(),
         expectedStoreArrivalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
-        pickupMethodId: pickupMethods[0].id,
+        pickupMethodCodeId: requireCode(pickupMethodCodeMap, 'STORE', 'PICKUP_METHOD'),
         salesPrice: 150000,
         orderNo: 'ORD-2025-001',
         notes: '初回オーダー',
         priorityId: priorityMap.NORMAL || 2,
         isUrgent: false,
         createdBy: users[0].id, // 店舗ユーザー (001)
-        items: {
-          create: [
-            {
-              itemTypeId: itemTypes[0].id, // ジャケット
-              quantity: 1,
-              unitPrice: 150000,
-              jacketDetails: {
-                create: {
-                  fabricId: fabric1?.id,
-                  patternId: pattern1?.id,
-                  sizeLabel: 'M',
-                  bastedFitting: true,
-                  remarks: '標準仕様',
-                },
-              },
-            },
-          ],
+        itemTypeCodeId: requireCode(itemTypeCodeMap, 'JACKET', 'ITEM_TYPE'),
+        quantity: 1,
+        unitPrice: 150000,
+        jacketDetails: {
+          create: {
+            fabricId: fabric1?.id,
+            patternId: pattern1?.id,
+            sizeLabel: 'M',
+            bastedFitting: true,
+            remarks: '標準仕様',
+            bodyLiningOrientationCodeId: requireCode(orientationCodeMap, 'NORMAL', 'ORIENTATION'),
+            sleeveLiningOrientationCodeId: requireCode(orientationCodeMap, 'NORMAL', 'ORIENTATION'),
+          },
         },
-      },
+      } as any,
     }),
     prisma.order.create({
       data: {
         storeId: stores[1].id,
         customerId: customers[1].id,
-        planId: plans[1].id,
+        planCodeId: requireCode(planCodeMap, '04', 'PLAN'),
         statusId: orderStatuses[2].id, // 確認済み
         receptionDate: new Date(),
         expectedStoreArrivalDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), // 45日後
-        pickupMethodId: pickupMethods[1].id,
+        pickupMethodCodeId: requireCode(pickupMethodCodeMap, 'DELIVERY', 'PICKUP_METHOD'),
         salesPrice: 200000,
         orderNo: 'ORD-2025-002',
         notes: 'カスタムオーダー',
         priorityId: priorityMap.HIGH || 3,
         isUrgent: false,
         createdBy: users[0].id, // 店舗ユーザー (001)
-        items: {
-          create: [
-            {
-              itemTypeId: itemTypes[2].id, // スーツ
-              quantity: 1,
-              unitPrice: 200000,
-              suitDetails: {
-                create: {
-                  fabricId: fabric2?.id,
-                  jacketPatternId: pattern2?.id,
-                  pantsPatternId: pattern3?.id,
-                  jacketSizeLabel: 'L',
-                  pantsSizeLabel: 'L',
-                  bastedFitting: true,
-                  remarks: 'カスタム仕様',
-                },
-              },
-            },
-          ],
+        itemTypeCodeId: requireCode(itemTypeCodeMap, 'SUIT', 'ITEM_TYPE'),
+        quantity: 1,
+        unitPrice: 200000,
+        suitDetails: {
+          create: {
+            fabricId: fabric2?.id,
+            jacketPatternId: pattern2?.id,
+            pantsPatternId: pattern3?.id,
+            jacketSizeLabel: 'L',
+            pantsSizeLabel: 'L',
+            bastedFitting: true,
+            remarks: 'カスタム仕様',
+            supplierId: suppliers[0].id,
+            bodyLiningOrientationCodeId: requireCode(orientationCodeMap, 'NORMAL', 'ORIENTATION'),
+            sleeveLiningOrientationCodeId: requireCode(orientationCodeMap, 'NORMAL', 'ORIENTATION'),
+          },
         },
-      },
+      } as any,
     }),
   ]);
 
@@ -785,10 +700,10 @@ async function main() {
   console.log(`   - ${stores.length} stores`);
   console.log(`   - ${users.length} users`);
   console.log(`   - ${customers.length} customers`);
-  console.log(`   - ${plans.length} plans`);
-  console.log(`   - ${itemTypes.length} item types`);
-  console.log(`   - ${pickupMethods.length} pickup methods`);
-  console.log(`   - ${orientationTypes.length} orientation types`);
+  console.log(`   - ${Object.keys(planCodeMap).length} plan codes (MCode)`);
+  console.log(`   - ${Object.keys(itemTypeCodeMap).length} item type codes (MCode)`);
+  console.log(`   - ${Object.keys(pickupMethodCodeMap).length} pickup method codes (MCode)`);
+  console.log(`   - ${Object.keys(orientationCodeMap).length} orientation codes (MCode)`);
   console.log(`   - ${suppliers.length} suppliers`);
   console.log(`   - ${fabrics.length} fabric masters`);
   console.log(`   - 5 pattern masters`);
