@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting unified seed...');
 
-  // ===== CREATE ORDER STATUSES =====
+  // ===== 注文ステータスを作成 =====
   console.log('📊 Creating order statuses...');
   const orderStatuses = await Promise.all([
     prisma.orderStatus.upsert({
@@ -83,7 +83,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE STORES =====
+  // ===== 店舗を作成 =====
   console.log('📦 Creating stores...');
   const stores = await Promise.all([
     prisma.store.upsert({
@@ -130,79 +130,68 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE USERS =====
+  // ===== ユーザーを作成 =====
   console.log('👥 Creating users...');
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const hashedPasswordStore = await bcrypt.hash('1111', 10);
+  const hashedPasswordFactory = await bcrypt.hash('1111', 10);
+  const hashedPasswordAdmin = await bcrypt.hash('ADMIN', 10);
+
+  const userRoles = await prisma.mCode.findMany({
+    where: { category: 'USER_ROLE', code: { in: ['ADMIN', 'STORE', 'FACTORY_STAFF'] } },
+  });
+  const roleMap = userRoles.reduce<Record<string, number>>((acc, role) => {
+    acc[role.code] = role.id;
+    return acc;
+  }, {});
+
+  if (!roleMap.ADMIN || !roleMap.STORE || !roleMap.FACTORY_STAFF) {
+    throw new Error('USER_ROLE codes (ADMIN, STORE, FACTORY_STAFF) are required. Please run seed-m-codes.ts first.');
+  }
 
   const users = await Promise.all([
-    // Admin user
+    // 店舗ユーザー: ユーザー名 "001", パスワード "1111"
     prisma.user.upsert({
-      where: { username: 'admin' },
+      where: { username: '001' },
       update: {},
       create: {
-        username: 'admin',
-        password: hashedPassword,
+        username: '001',
+        password: hashedPasswordStore,
+        email: 'store@beams.co.jp',
+        phone: '03-3354-1234',
+        roleId: roleMap.STORE,
+        storeId: stores[0].id,
+        isActive: true,
+      },
+    }),
+    // 工場ユーザー: ユーザー名 "123", パスワード "1111"
+    prisma.user.upsert({
+      where: { username: '123' },
+      update: {},
+      create: {
+        username: '123',
+        password: hashedPasswordFactory,
+        email: 'factory@beams.co.jp',
+        phone: '03-9876-5432',
+        roleId: roleMap.FACTORY_STAFF,
+        isActive: true,
+      },
+    }),
+    // 管理者ユーザー: ユーザー名 "ADMIN", パスワード "ADMIN"
+    prisma.user.upsert({
+      where: { username: 'ADMIN' },
+      update: {},
+      create: {
+        username: 'ADMIN',
+        password: hashedPasswordAdmin,
         email: 'admin@beams.co.jp',
         phone: '03-1234-5678',
-        role: 'ADMIN',
-        isActive: true,
-      },
-    }),
-    // Store managers
-    prisma.user.upsert({
-      where: { username: 'store_manager_001' },
-      update: {},
-      create: {
-        username: 'store_manager_001',
-        password: hashedPassword,
-        email: 'manager.shinjuku@beams.co.jp',
-        phone: '03-3354-1234',
-        role: 'STORE_MANAGER',
-        storeId: stores[0].id,
-        isActive: true,
-      },
-    }),
-    prisma.user.upsert({
-      where: { username: 'store_staff_001' },
-      update: {},
-      create: {
-        username: 'store_staff_001',
-        password: hashedPassword,
-        email: 'staff.shinjuku@beams.co.jp',
-        phone: '03-3354-1235',
-        role: 'STORE_STAFF',
-        storeId: stores[0].id,
-        isActive: true,
-      },
-    }),
-    // Factory users
-    prisma.user.upsert({
-      where: { username: 'factory_manager' },
-      update: {},
-      create: {
-        username: 'factory_manager',
-        password: hashedPassword,
-        email: 'factory.manager@beams.co.jp',
-        phone: '03-9876-5432',
-        role: 'FACTORY_MANAGER',
-        isActive: true,
-      },
-    }),
-    prisma.user.upsert({
-      where: { username: 'factory_staff_001' },
-      update: {},
-      create: {
-        username: 'factory_staff_001',
-        password: hashedPassword,
-        email: 'factory.staff@beams.co.jp',
-        phone: '03-9876-5433',
-        role: 'FACTORY_STAFF',
+        roleId: roleMap.ADMIN,
         isActive: true,
       },
     }),
   ]);
 
-  // ===== CREATE CUSTOMERS =====
+  // ===== 顧客を作成 =====
   console.log('👤 Creating customers...');
   const customers = await Promise.all([
     prisma.customer.upsert({
@@ -249,7 +238,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE PLANS =====
+  // ===== プランを作成 =====
   console.log('📋 Creating plans...');
   const plans = await Promise.all([
     prisma.plan.upsert({
@@ -281,7 +270,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE ITEM TYPES =====
+  // ===== アイテムタイプを作成 =====
   console.log('👔 Creating item types...');
   const itemTypes = await Promise.all([
     prisma.itemType.upsert({
@@ -331,7 +320,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE PICKUP METHODS =====
+  // ===== 受取方法を作成 =====
   console.log('🚚 Creating pickup methods...');
   const pickupMethods = await Promise.all([
     prisma.pickupMethod.upsert({
@@ -354,7 +343,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE ORIENTATION TYPES =====
+  // ===== 向きタイプを作成 =====
   console.log('🧭 Creating orientation types...');
   const orientationTypes = await Promise.all([
     prisma.orientationType.upsert({
@@ -377,7 +366,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE SUPPLIERS =====
+  // ===== 仕入先を作成 =====
   console.log('🏭 Creating suppliers...');
   const suppliers = await Promise.all([
     prisma.supplier.upsert({
@@ -406,7 +395,7 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE HEAVY FABRIC MASTERS =====
+  // ===== 重厚生地マスタを作成 =====
   console.log('🧵 Creating heavy fabric masters...');
   const fabrics = await Promise.all([
     prisma.heavyFabricMaster.upsert({
@@ -455,14 +444,15 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE PATTERN MASTERS =====
+  // ===== パターンマスタを作成 =====
   console.log('📐 Creating pattern masters...');
 
-  // Jacket Patterns
-  await prisma.jacketPatternMaster.upsert({
+  // ジャケットパターン
+  await prisma.patternMaster.upsert({
     where: { patternNo: 'JKT001' },
     update: {},
     create: {
+      itemTypeId: itemTypes[0].id, // ジャケット
       patternNo: 'JKT001',
       size: 'M',
       length: 70.0,
@@ -479,11 +469,12 @@ async function main() {
     },
   });
 
-  // Suit Patterns
-  await prisma.suitPatternMaster.upsert({
+  // スーツパターン
+  await prisma.patternMaster.upsert({
     where: { patternNo: 'SUIT001' },
     update: {},
     create: {
+      itemTypeId: itemTypes[2].id, // スーツ
       patternNo: 'SUIT001',
       size: 'M',
       length: 70.0,
@@ -499,11 +490,12 @@ async function main() {
     },
   });
 
-  // Vest Patterns
-  await prisma.vestPatternMaster.upsert({
+  // ベストパターン
+  await prisma.patternMaster.upsert({
     where: { patternNo: 'VEST001' },
     update: {},
     create: {
+      itemTypeId: itemTypes[4].id, // ベスト
       patternNo: 'VEST001',
       size: 'M',
       length: 65.0,
@@ -515,11 +507,12 @@ async function main() {
     },
   });
 
-  // Coat Patterns
-  await prisma.coatPatternMaster.upsert({
+  // コートパターン
+  await prisma.patternMaster.upsert({
     where: { patternNo: 'COAT001' },
     update: {},
     create: {
+      itemTypeId: itemTypes[1].id, // コート
       patternNo: 'COAT001',
       size: 'M',
       length: 110.0,
@@ -534,11 +527,12 @@ async function main() {
     },
   });
 
-  // Pants Patterns
-  await prisma.pantsPatternMaster.upsert({
+  // パンツパターン
+  await prisma.patternMaster.upsert({
     where: { patternNo: 'PANTS001' },
     update: {},
     create: {
+      itemTypeId: itemTypes[3].id, // パンツ
       patternNo: 'PANTS001',
       size: 'M',
       waist: 85.0,
@@ -552,10 +546,10 @@ async function main() {
     },
   });
 
-  // ===== CREATE LINING MASTERS =====
+  // ===== 裏地マスタを作成 =====
   console.log('🧵 Creating lining masters...');
 
-  // Body Lining
+  // ボディ裏地
   await prisma.bodyLiningMaster.upsert({
     where: { productNo: 'BL001' },
     update: {},
@@ -567,7 +561,7 @@ async function main() {
     },
   });
 
-  // Sleeve Lining
+  // スリーブ裏地
   await prisma.sleeveLiningMaster.upsert({
     where: { productNo: 'SL001' },
     update: {},
@@ -579,7 +573,7 @@ async function main() {
     },
   });
 
-  // ===== CREATE BUTTON MASTERS =====
+  // ===== ボタンマスタを作成 =====
   console.log('🔘 Creating button masters...');
   await prisma.heavyFabricButtonMaster.upsert({
     where: { id: 1 },
@@ -608,7 +602,7 @@ async function main() {
     },
   });
 
-  // ===== CREATE OPTION MASTERS =====
+  // ===== オプションマスタを作成 =====
   console.log('⚙️ Creating option masters...');
   await prisma.optionMaster.upsert({
     where: { id: 1 },
@@ -621,7 +615,23 @@ async function main() {
     },
   });
 
-  // ===== CREATE SAMPLE ORDERS =====
+  // ===== 優先度のMCode IDを取得 =====
+  const priorityCodes = await prisma.mCode.findMany({
+    where: { category: 'ORDER_PRIORITY', code: { in: ['NORMAL', 'HIGH'] } },
+  });
+  const priorityMap = priorityCodes.reduce<Record<string, number>>((acc, p) => {
+    acc[p.code] = p.id;
+    return acc;
+  }, {});
+
+  // ===== 生地とパターンのIDを取得 =====
+  const fabric1 = await prisma.heavyFabricMaster.findUnique({ where: { fabricNo: 'FAB-001' } });
+  const fabric2 = await prisma.heavyFabricMaster.findUnique({ where: { fabricNo: 'FAB-002' } });
+  const pattern1 = await prisma.patternMaster.findUnique({ where: { patternNo: 'JKT001' } });
+  const pattern2 = await prisma.patternMaster.findUnique({ where: { patternNo: 'SUIT001' } });
+  const pattern3 = await prisma.patternMaster.findUnique({ where: { patternNo: 'PANTS001' } });
+
+  // ===== サンプル注文を作成 =====
   console.log('📦 Creating sample orders...');
   const orders = await Promise.all([
     prisma.order.create({
@@ -629,26 +639,26 @@ async function main() {
         storeId: stores[0].id,
         customerId: customers[0].id,
         planId: plans[0].id,
-        statusId: orderStatuses[1].id, // PENDING
+        statusId: orderStatuses[1].id, // 受付済み
         receptionDate: new Date(),
-        expectedStoreArrivalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        expectedStoreArrivalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
         pickupMethodId: pickupMethods[0].id,
         salesPrice: 150000,
         orderNo: 'ORD-2025-001',
         notes: '初回オーダー',
-        priority: 'NORMAL',
+        priorityId: priorityMap.NORMAL || 2,
         isUrgent: false,
-        createdBy: users[1].id, // Store manager
+        createdBy: users[0].id, // 店舗ユーザー (001)
         items: {
           create: [
             {
-              itemTypeId: itemTypes[0].id, // Jacket
+              itemTypeId: itemTypes[0].id, // ジャケット
               quantity: 1,
               unitPrice: 150000,
               jacketDetails: {
                 create: {
-                  fabricNo: 'FAB-001',
-                  patternNo: 'PAT-001',
+                  fabricId: fabric1?.id,
+                  patternId: pattern1?.id,
                   sizeLabel: 'M',
                   bastedFitting: true,
                   remarks: '標準仕様',
@@ -664,27 +674,27 @@ async function main() {
         storeId: stores[1].id,
         customerId: customers[1].id,
         planId: plans[1].id,
-        statusId: orderStatuses[2].id, // CONFIRMED
+        statusId: orderStatuses[2].id, // 確認済み
         receptionDate: new Date(),
-        expectedStoreArrivalDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), // 45 days from now
+        expectedStoreArrivalDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), // 45日後
         pickupMethodId: pickupMethods[1].id,
         salesPrice: 200000,
         orderNo: 'ORD-2025-002',
         notes: 'カスタムオーダー',
-        priority: 'HIGH',
+        priorityId: priorityMap.HIGH || 3,
         isUrgent: false,
-        createdBy: users[2].id, // Store staff
+        createdBy: users[0].id, // 店舗ユーザー (001)
         items: {
           create: [
             {
-              itemTypeId: itemTypes[2].id, // Suit
+              itemTypeId: itemTypes[2].id, // スーツ
               quantity: 1,
               unitPrice: 200000,
               suitDetails: {
                 create: {
-                  fabricNo: 'FAB-002',
-                  jacketPatternNo: 'PAT-002',
-                  pantsPatternNo: 'PAT-003',
+                  fabricId: fabric2?.id,
+                  jacketPatternId: pattern2?.id,
+                  pantsPatternId: pattern3?.id,
                   jacketSizeLabel: 'L',
                   pantsSizeLabel: 'L',
                   bastedFitting: true,
@@ -698,15 +708,24 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE SAMPLE NOTIFICATIONS =====
+  // ===== 通知タイプのIDを取得 =====
+  const notificationTypes = await prisma.mCode.findMany({
+    where: { category: 'NOTIFICATION_TYPE', code: { in: ['ORDER_CREATED', 'ORDER_UPDATED'] } },
+  });
+  const notificationTypeMap = notificationTypes.reduce<Record<string, number>>((acc, nt) => {
+    acc[nt.code] = nt.id;
+    return acc;
+  }, {});
+
+  // ===== サンプル通知を作成 =====
   console.log('🔔 Creating sample notifications...');
   await Promise.all([
     prisma.notification.create({
       data: {
-        userId: users[1].id,
+        userId: users[0].id, // 店舗ユーザー (001)
         title: '新しいオーダーが作成されました',
         message: `オーダー ${orders[0].orderNo} が作成されました`,
-        type: 'ORDER_CREATED',
+        typeId: notificationTypeMap.ORDER_CREATED || 1,
         data: {
           orderId: orders[0].id,
           orderNo: orders[0].orderNo,
@@ -715,10 +734,10 @@ async function main() {
     }),
     prisma.notification.create({
       data: {
-        userId: users[3].id, // Factory manager
+        userId: users[1].id, // 工場ユーザー (123)
         title: 'オーダー確認待ち',
         message: `オーダー ${orders[1].orderNo} の確認をお願いします`,
-        type: 'ORDER_UPDATED',
+        typeId: notificationTypeMap.ORDER_UPDATED || 2,
         data: {
           orderId: orders[1].id,
           orderNo: orders[1].orderNo,
@@ -727,14 +746,14 @@ async function main() {
     }),
   ]);
 
-  // ===== CREATE SAMPLE ORDER LOGS =====
+  // ===== サンプル注文ログを作成 =====
   console.log('📝 Creating sample order logs...');
   await Promise.all([
     prisma.orderLog.create({
       data: {
         orderId: orders[0].id,
-        userId: users[1].id,
-        statusId: orderStatuses[0].id, // DRAFT
+        userId: users[0].id, // 店舗ユーザー (001)
+        statusId: orderStatuses[0].id, // 下書き
         action: 'CREATED',
         description: 'オーダーが作成されました',
         newValues: {
@@ -746,8 +765,8 @@ async function main() {
     prisma.orderLog.create({
       data: {
         orderId: orders[0].id,
-        userId: users[1].id,
-        statusId: orderStatuses[1].id, // PENDING
+        userId: users[0].id, // 店舗ユーザー (001)
+        statusId: orderStatuses[1].id, // 受付済み
         action: 'STATUS_CHANGED',
         description: 'ステータスが受付済みに変更されました',
         oldValues: {

@@ -24,7 +24,6 @@ model User {
   store       Store?   @relation(fields: [storeId], references: [id])
   roleId      Int?     // FK to MCode with category "USER_ROLE"
   role        MCode?   @relation("UserRoleCode", fields: [roleId], references: [id])
-  orders      Order[]
   orderLogs   OrderLog[]
   notifications Notification[]
   createdOrders Order[] @relation("OrderCreatedBy")
