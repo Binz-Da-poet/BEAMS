@@ -65,7 +65,7 @@ export class HeavyFabricMasterService {
   async search(query: string): Promise<HeavyFabricMaster[]> {
     return this.prisma.heavyFabricMaster.findMany({
       where: {
-        OR: [{ fabricNo: { contains: query } }, { fabricMaker: { contains: query } }, { color: { contains: query } }, { pattern: { contains: query } }, { composition: { contains: query } }],
+        OR: [{ fabricNo: { contains: query } }, { fabricManufacturer: { contains: query } }, { color: { contains: query } }, { fabricPattern: { contains: query } }, { composition: { contains: query } }],
       },
       include: {
         supplier: true,

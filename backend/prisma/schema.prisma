@@ -7,54 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ===== USER MANAGEMENT =====
+// ===== ユーザー管理 =====
 model User {
   id          Int       @id @default(autoincrement())
   username    String    @unique
-  password    String // Should be hashed before storage
-  email       String?   @unique
-  phone       String?
+  password    String // 保存前にハッシュ化する必要があります
   role        UserRole  @default(STORE)
   isActive    Boolean   @default(true)
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Relations
+  // リレーション
   storeId          Int?
   store            Store?         @relation(fields: [storeId], references: [id])
+  staffId          Int?
+  staff            Staff?         @relation(fields: [staffId], references: [id])
   orderLogs        OrderLog[]
   notifications    Notification[]
-  createdOrders    Order[]        @relation("OrderCreatedBy")
-  updatedOrders    Order[]        @relation("OrderUpdatedBy")
   deletedStores    Store[]        @relation("StoreDeletedBy")
-  deletedCustomers Customer[]     @relation("CustomerDeletedBy")
 
   @@map("t_users")
 }
 
-// User roles managed via enum UserRole (ADMIN, STORE, FACTORY_STAFF)
+// ユーザーロールはenum UserRole (ADMIN, STORE, FACTORY_STAFF) で管理
 
-// ===== ORDER STATUS MANAGEMENT =====
-model OrderStatus {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  code        String  @unique
-  description String?
-  isActive    Boolean @default(true)
-  sortOrder   Int     @default(0)
-  color       String? // For UI display
-
-  // Relations
-  mCodeId   Int?       @map("m_code_id")
-  mCode     MCode?     @relation("OrderStatusCode", fields: [mCodeId], references: [id])
-  orders    Order[]
-  orderLogs OrderLog[]
-
-  @@map("t_order_statuses")
-}
-
-// ===== ORDER WORKFLOW TRACKING =====
+// ===== オーダーワークフロー追跡 =====
+// OrderStatusはMCodeテーブルに移動（カテゴリ "ORDER_STATUS"）
 model OrderLog {
   id          Int      @id @default(autoincrement())
   orderId     Int
@@ -62,14 +41,14 @@ model OrderLog {
   statusId    Int
   action      String // "CREATED", "UPDATED", "STATUS_CHANGED", "PDF_GENERATED"
   description String?
-  oldValues   Json?    @db.Json // Store previous values (max 1MB)
-  newValues   Json?    @db.Json // Store new values (max 1MB)
+  oldValues   Json?    @db.Json // 以前の値を保存（最大1MB）
+  newValues   Json?    @db.Json // 新しい値を保存（最大1MB）
   createdAt   DateTime @default(now())
 
-  // Relations
-  order  Order       @relation(fields: [orderId], references: [id])
-  user   User        @relation(fields: [userId], references: [id])
-  status OrderStatus @relation(fields: [statusId], references: [id])
+  // リレーション
+  order  Order @relation(fields: [orderId], references: [id])
+  user   User  @relation(fields: [userId], references: [id])
+  status MCode @relation("OrderLogStatus", fields: [statusId], references: [id])
 
   @@index([orderId, createdAt])
   @@index([userId, createdAt])
@@ -77,29 +56,27 @@ model OrderLog {
   @@map("t_order_logs")
 }
 
-// ===== PDF DOCUMENT MANAGEMENT =====
+// ===== PDF文書管理 =====
 model Document {
   id          Int      @id @default(autoincrement())
-  orderId     Int
   typeId      Int
   type        MCode?   @relation("DocumentTypeCode", fields: [typeId], references: [id])
   fileName    String
   filePath    String
   fileSize    Int?
   generatedAt DateTime @default(now())
-  generatedBy Int // User ID
+  generatedBy Int // ユーザーID
 
-  // Relations
-  order Order @relation(fields: [orderId], references: [id])
+  // リレーション
+  // 注意: オーダーリレーション削除 - 文書はオーダーにリンクされなくなりました
 
-  @@index([orderId])
   @@index([typeId])
   @@map("t_documents")
 }
 
-// DocumentType moved to MCode table with category "DOCUMENT_TYPE"
+// DocumentTypeはMCodeテーブルに移動（カテゴリ "DOCUMENT_TYPE"）
 
-// ===== NOTIFICATION SYSTEM =====
+// ===== 通知システム =====
 model Notification {
   id        Int       @id @default(autoincrement())
   userId    Int
@@ -108,11 +85,11 @@ model Notification {
   typeId    Int
   type      MCode?    @relation("NotificationTypeCode", fields: [typeId], references: [id])
   isRead    Boolean   @default(false)
-  data      Json?     @db.Json // Additional data (max 1MB)
+  data      Json?     @db.Json // 追加データ（最大1MB）
   createdAt DateTime  @default(now())
   readAt    DateTime?
 
-  // Relations
+  // リレーション
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead])
@@ -120,26 +97,27 @@ model Notification {
   @@map("t_notifications")
 }
 
-// NotificationType moved to MCode table with category "NOTIFICATION_TYPE"
+// NotificationTypeはMCodeテーブルに移動（カテゴリ "NOTIFICATION_TYPE"）
 
-// ===== MASTER CODE MANAGEMENT =====
+// ===== マスターコード管理 =====
 model MCode {
   id          Int      @id @default(autoincrement())
-  category    String // "ITEM_TYPE", "PLAN", "PICKUP_METHOD", "ORIENTATION", "SEASON", "SUPPLIER", "NOTIFICATION_TYPE", "DOCUMENT_TYPE", "ORDER_PRIORITY"
+  category    String // "ITEM_TYPE", "PLAN", "PICKUP_METHOD", "ORIENTATION", "SEASON", "SUPPLIER", "NOTIFICATION_TYPE", "DOCUMENT_TYPE", "ORDER_STATUS"
   code        String
   name        String
   description String?
   sortOrder   Int      @default(0)
   isActive    Boolean  @default(true)
-  metadata    Json?    @db.Json // Additional data for specific codes (max 1MB)
+  metadata    Json?    @db.Json // 特定コードの追加データ（最大1MB）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
+  // リレーション
   orderPlanCodes                     Order[]           @relation("OrderPlanCode")
   orderPickupMethodCodes             Order[]           @relation("OrderPickupMethodCode")
-  orderPriorityCodes                 Order[]           @relation("OrderPriorityCode")
   orderItemTypeCodes                 Order[]           @relation("OrderItemTypeCode")
+  orderStatusCodes                   Order[]           @relation("OrderStatus")
+  orderLogStatusCodes                OrderLog[]        @relation("OrderLogStatus")
   measurementTypeItemTypeCodes       MeasurementType[] @relation("MeasurementTypeItemTypeCode")
   patternMasterItemTypeCodes         PatternMaster[]   @relation("PatternMasterItemTypeCode")
   coatSeasonCodes                    CoatDetails[]     @relation("CoatSeasonCode")
@@ -153,7 +131,6 @@ model MCode {
   suitBodyLiningOrientationCodes     SuitDetails[]     @relation("SuitBodyLiningOrientationCode")
   suitSleeveLiningOrientationCodes   SuitDetails[]     @relation("SuitSleeveLiningOrientationCode")
   vestBodyLiningOrientationCodes     VestDetails[]     @relation("VestBodyLiningOrientationCode")
-  orderStatuses                      OrderStatus[]     @relation("OrderStatusCode")
   documents                          Document[]        @relation("DocumentTypeCode")
   notifications                      Notification[]    @relation("NotificationTypeCode")
 
@@ -163,7 +140,7 @@ model MCode {
   @@map("m_codes")
 }
 
-// ===== ENHANCED STORE MODEL =====
+// ===== 拡張ストアモデル =====
 model Store {
   id      Int     @id @default(autoincrement())
   name    String
@@ -172,7 +149,7 @@ model Store {
   phone   String?
   email   String?
 
-  // Enhanced fields
+  // 拡張フィールド
   isActive    Boolean   @default(true)
   region      String?
   managerName String?
@@ -181,119 +158,106 @@ model Store {
   deletedAt   DateTime?
   deletedBy   Int?
 
-  // Relations
+  // リレーション
   orders        Order[]
-  staff         Staff[]
   users         User[]
+  staffOfStores StaffOfStore[]
   deletedByUser User?   @relation("StoreDeletedBy", fields: [deletedBy], references: [id])
 
   @@map("t_stores")
 }
 
-// ===== ENHANCED CUSTOMER MODEL =====
-model Customer {
-  id    Int     @id @default(autoincrement())
-  name  String
-  kana  String?
-  phone String?
-  email String?
-  note  String?
+// ===== ストアスタッフ =====
+model StaffOfStore {
+  id      Int     @id @default(autoincrement())
+  name    String
+  phone   String?
+  storeId Int
 
-  // Enhanced fields
-  customerCode String?   @unique
-  birthDate    DateTime?
-  address      String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-  deletedBy    Int?
+  // リレーション
+  store Store  @relation(fields: [storeId], references: [id])
+  orders Order[]
 
-  // Relations
-  orders        Order[]
-  deletedByUser User?   @relation("CustomerDeletedBy", fields: [deletedBy], references: [id])
-
-  @@map("t_customers")
+  @@index([storeId])
+  @@map("t_staff_of_store")
 }
 
-// ===== ENHANCED ORDER MODEL =====
+// ===== 拡張オーダーモデル =====
 model Order {
   id                       Int       @id @default(autoincrement())
   storeId                  Int
-  customerId               Int
   planCodeId               Int
-  statusId                 Int       @default(1) // Default to first status
+  statusId                 Int       @default(1) // デフォルトは最初のステータス
   receptionDate            DateTime
   expectedStoreArrivalDate DateTime?
   pickupMethodCodeId       Int?
-  salesPrice               Decimal? // Must be >= 0
+  salesPrice               Int? // 0以上である必要があります
   orderNo                  String?   @unique
   notes                    String?
 
-  // Enhanced fields
-  priorityId              Int       @default(2) // Default to NORMAL priority
-  priority                MCode?    @relation("OrderPriorityCode", fields: [priorityId], references: [id])
+  // 顧客情報
+  customerSurname          String?
+  customerName             String?
+  customerSurnameFurigana  String?
+  customerNameFurigana     String?
+  customerPhone            String?
+  customerZipCode          String?
+  customerAddress          String?
+  beamsClubId              String?
+
+  // 拡張フィールド
   estimatedCompletionDate DateTime?
   actualCompletionDate    DateTime?
   isUrgent                Boolean   @default(false)
-  internalNotes           String? // Ghi chú nội bộ
+  internalNotes           String? // 内部メモ
 
-  // Item fields (moved from OrderItem)
+  // アイテムフィールド（OrderItemから移動）
   itemTypeCodeId   Int
-  staffId          Int?
-  quantity         Int       @default(1) // Must be > 0
-  unitPrice        Decimal? // Must be >= 0
+  staffOfStoreId   Int?
+  unitPrice        Int? // 0以上である必要があります
   orderPeriodStart DateTime?
   orderPeriodEnd   DateTime?
 
-  // Audit fields
-  createdBy Int
-  updatedBy Int?
+  // 監査フィールド
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  customer         Customer       @relation(fields: [customerId], references: [id])
+  // リレーション
   planCode         MCode          @relation("OrderPlanCode", fields: [planCodeId], references: [id])
   pickupMethodCode MCode?         @relation("OrderPickupMethodCode", fields: [pickupMethodCodeId], references: [id])
   store            Store          @relation(fields: [storeId], references: [id])
-  status           OrderStatus    @relation(fields: [statusId], references: [id])
-  createdByUser    User           @relation("OrderCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser    User?          @relation("OrderUpdatedBy", fields: [updatedBy], references: [id])
+  status           MCode          @relation("OrderStatus", fields: [statusId], references: [id])
   itemTypeCode     MCode          @relation("OrderItemTypeCode", fields: [itemTypeCodeId], references: [id])
-  staff            Staff?         @relation(fields: [staffId], references: [id])
-  jacketDetails    JacketDetails?
-  coatDetails      CoatDetails?
-  suitDetails      SuitDetails?
-  pantsDetails     PantsDetails?
-  vestDetails      VestDetails?
+  staffOfStore     StaffOfStore?  @relation(fields: [staffOfStoreId], references: [id])
+  
+  // Detailsリレーション - itemTypeCodeIdに基づいて、オーダーごとに1つのDetailsのみ
+  // アプリケーションレベルでの検証が必要（1つのDetailsのみが作成されることを保証）
+  // 例: itemTypeCodeId = JACKETの場合、jacketDetailsのみが存在すべき
+  jacketDetails    JacketDetails?  // itemTypeCodeId = JACKETの場合のみ
+  coatDetails      CoatDetails?    // itemTypeCodeId = COATの場合のみ
+  suitDetails      SuitDetails?    // itemTypeCodeId = SUITの場合のみ
+  pantsDetails     PantsDetails?   // itemTypeCodeId = PANTSの場合のみ
+  vestDetails      VestDetails?    // itemTypeCodeId = VESTの場合のみ
+  
   logs             OrderLog[]
-  documents        Document[]
 
-  // Indexes for performance
+  // パフォーマンス用インデックス
   @@index([orderNo])
   @@index([statusId, createdAt])
   @@index([storeId, statusId, createdAt])
-  @@index([customerId, createdAt])
-  @@index([createdBy, createdAt])
-  @@index([priorityId, createdAt])
   @@index([itemTypeCodeId])
-  @@index([staffId])
+  @@index([staffOfStoreId])
   @@map("t_orders")
 }
 
-// OrderPriority moved to MCode table with category "ORDER_PRIORITY"
-
-// ===== EXISTING MODELS (KEEPING EXISTING STRUCTURE) =====
+// ===== 既存モデル（既存構造を維持） =====
 model Staff {
-  id      Int     @id @default(autoincrement())
-  storeId Int
-  name    String
-  email   String?
-  phone   String?
-  role    String?
-  orders  Order[]
-  store   Store   @relation(fields: [storeId], references: [id])
+  id          Int     @id @default(autoincrement())
+  staffNumber String  @unique @map("staff_number")
+  name        String
+  email       String?
+  phone       String?
+  users       User[]
 
   @@map("t_staff")
 }
@@ -320,10 +284,10 @@ model JacketDetails {
   bastedFitting                 Boolean?
   remarks                       String?
 
-  // Relations to measurements
+  // 測定へのリレーション
   measurements Measurement[] @relation("JacketMeasurements")
 
-  // Relations
+  // リレーション
   bodyLining                  BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientationCode   MCode?                   @relation("JacketBodyLiningOrientationCode", fields: [bodyLiningOrientationCodeId], references: [id])
   button                      HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
@@ -337,7 +301,7 @@ model JacketDetails {
   @@map("t_jacket_details")
 }
 
-// ===== UNIFIED MEASUREMENT TYPE =====
+// ===== 統一測定タイプ =====
 model MeasurementType {
   id             Int      @id @default(autoincrement())
   itemTypeCodeId Int
@@ -349,7 +313,7 @@ model MeasurementType {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  // Relations
+  // リレーション
   itemTypeCode MCode         @relation("MeasurementTypeItemTypeCode", fields: [itemTypeCodeId], references: [id])
   measurements Measurement[]
 
@@ -358,28 +322,29 @@ model MeasurementType {
   @@map("m_measurement_type")
 }
 
-// ===== UNIFIED MEASUREMENT TABLE =====
+// ===== 統一測定テーブル =====
 model Measurement {
   id            Int      @id @default(autoincrement())
-  detailsId     Int // FK to any Details table
-  detailsType   String // "JACKET", "COAT", "SUIT", "PANTS", "VEST"
-  typeId        Int // FK to MeasurementType
+  detailsId     Int // DetailsテーブルへのFK（orderId）
+  typeId        Int // MeasurementTypeへのFK
   standardValue Decimal? @db.Decimal(10, 2)
   adjustValue   Decimal? @db.Decimal(10, 2)
   finalValue    Decimal? @db.Decimal(10, 2)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // Relations
+  // リレーション
+  // 注意: 各Measurementは1つのDetailsテーブルのみに関連付けられます
+  // アプリケーションレベルでの検証が必要（1つのrelationのみが設定されることを保証）
   type          MeasurementType @relation(fields: [typeId], references: [id])
-  jacketDetails JacketDetails?  @relation("JacketMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementJacketDetails")
-  coatDetails   CoatDetails?    @relation("CoatMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementCoatDetails")
-  suitDetails   SuitDetails?    @relation("SuitMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementSuitDetails")
+  jacketDetails JacketDetails?   @relation("JacketMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementJacketDetails")
+  coatDetails   CoatDetails?     @relation("CoatMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementCoatDetails")
+  suitDetails   SuitDetails?     @relation("SuitMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementSuitDetails")
   pantsDetails  PantsDetails?   @relation("PantsMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementPantsDetails")
-  vestDetails   VestDetails?    @relation("VestMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementVestDetails")
+  vestDetails   VestDetails?     @relation("VestMeasurements", fields: [detailsId], references: [orderId], map: "MeasurementVestDetails")
 
-  @@unique([detailsId, detailsType, typeId])
-  @@index([detailsId, detailsType])
+  @@unique([detailsId, typeId])
+  @@index([detailsId])
   @@index([typeId])
   @@map("t_measurements")
 }
@@ -408,10 +373,10 @@ model CoatDetails {
   bastedFitting                 Boolean?
   remarks                       String?
 
-  // Relations to measurements
+  // 測定へのリレーション
   measurements Measurement[] @relation("CoatMeasurements")
 
-  // Relations
+  // リレーション
   bodyLining                  BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientationCode   MCode?                   @relation("CoatBodyLiningOrientationCode", fields: [bodyLiningOrientationCodeId], references: [id])
   button                      HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
@@ -430,29 +395,29 @@ model CoatDetails {
 
 model HeavyFabricMaster {
   id                     Int       @id @default(autoincrement())
-  fabricMaker            String?
-  fabricNo               String    @unique
+  fabric_manufacturer    String?
+  fabric_no              String    @unique
   color                  String?
-  pattern                String?
+  fabric_pattern         String?
   composition            String?
-  characteristics        String?
-  fairFabricUnitPrice    Decimal?
-  fairFabricRank         String?
-  regularFabricUnitPrice Decimal?
-  regularFabricRank      String?
-  dataUpdated            DateTime?
-  largePattern           Boolean?
-  transparent            Boolean?
-  stockFlag              Boolean?
+  fabric_properties      String?
+  fair_fabric_price      Int?
+  fair_fabric_rank       String?
+  regular_fabric_price   Int?
+  regular_fabric_rank    String?
+  fabric_data_update     DateTime?
+  large                  Boolean?
+  fabric_sheer           Boolean?
+  stock_flag             Boolean?
   supplierId             Int
 
-  // Audit fields
+  // 監査フィールド
   createdBy Int?
   updatedBy Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
+  // リレーション
   coatDetails   CoatDetails[]
   supplier      Supplier        @relation(fields: [supplierId], references: [id])
   jacketDetails JacketDetails[]
@@ -460,13 +425,13 @@ model HeavyFabricMaster {
   suitDetails   SuitDetails[]
   vestDetails   VestDetails[]
 
-  @@index([fabricNo])
+  @@index([fabric_no])
   @@index([supplierId])
   @@index([createdAt])
   @@map("m_heavy_fabric")
 }
 
-// ===== UNIFIED PATTERN MASTER =====
+// ===== 統一パターンマスター =====
 model PatternMaster {
   id                 Int      @id @default(autoincrement())
   itemTypeCodeId     Int
@@ -480,11 +445,11 @@ model PatternMaster {
   sleeveLength       Decimal?
   sleeveWidth        Decimal?
   lapelWidth         Decimal?
-  crotchWidth        Decimal? // For pants
-  kneeWidth          Decimal? // For pants
-  hemWidth           Decimal? // For pants
-  rise               Decimal? // For pants
-  inseam             Decimal? // For pants
+  crotchWidth        Decimal? // パンツ用
+  kneeWidth          Decimal? // パンツ用
+  hemWidth           Decimal? // パンツ用
+  rise               Decimal? // パンツ用
+  inseam             Decimal? // パンツ用
   stitchSpec         String?
   liningSpec         String?
   defaultButtonCount Int?
@@ -492,7 +457,7 @@ model PatternMaster {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  // Relations
+  // リレーション
   itemTypeCode      MCode           @relation("PatternMasterItemTypeCode", fields: [itemTypeCodeId], references: [id])
   jacketDetails     JacketDetails[]
   coatDetails       CoatDetails[]
@@ -506,7 +471,7 @@ model PatternMaster {
   @@map("m_pattern")
 }
 
-// Legacy Pattern Master tables removed - use unified PatternMaster instead
+// レガシーパターンマスターテーブルは削除 - 統一PatternMasterを使用
 
 model BodyLiningMaster {
   id            Int             @id @default(autoincrement())
@@ -541,22 +506,22 @@ model HeavyFabricButtonMaster {
   colorNo           String?
   pantsProductNo    String?
   pantsColorNo      String?
-  cost1             Decimal?
-  cost2             Decimal?
-  cost3             Decimal?
-  cost4             Decimal?
-  cost5             Decimal?
-  cost6             Decimal?
-  cost7             Decimal?
-  cost8             Decimal?
-  retailPrice1      Decimal?
-  retailPrice2      Decimal?
-  retailPrice3      Decimal?
-  retailPrice4      Decimal?
-  retailPrice5      Decimal?
-  retailPrice6      Decimal?
-  retailPrice7      Decimal?
-  retailPrice8      Decimal?
+  cost1             Int?
+  cost2             Int?
+  cost3             Int?
+  cost4             Int?
+  cost5             Int?
+  cost6             Int?
+  cost7             Int?
+  cost8             Int?
+  retailPrice1      Int?
+  retailPrice2      Int?
+  retailPrice3      Int?
+  retailPrice4      Int?
+  retailPrice5      Int?
+  retailPrice6      Int?
+  retailPrice7      Int?
+  retailPrice8      Int?
   coatDetails       CoatDetails[]
   jacketDetails     JacketDetails[]
   pantsDetails      PantsDetails[]
@@ -570,8 +535,8 @@ model HeavyFabricButtonMaster {
 model OptionMaster {
   id            Int             @id @default(autoincrement())
   optionName    String
-  cost          Decimal?
-  retailPrice   Decimal?
+  cost          Int?
+  retailPrice   Int?
   textContent   String?
   coatDetails   CoatDetails[]
   jacketDetails JacketDetails[]
@@ -629,10 +594,10 @@ model SuitDetails {
   bastedFitting                 Boolean?
   remarks                       String?
 
-  // Relations to measurements
+  // 測定へのリレーション
   measurements Measurement[] @relation("SuitMeasurements")
 
-  // Relations
+  // リレーション
   bodyLining                  BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientationCode   MCode?                   @relation("SuitBodyLiningOrientationCode", fields: [bodyLiningOrientationCodeId], references: [id])
   fabric                      HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
@@ -667,10 +632,10 @@ model PantsDetails {
   bastedFitting      Boolean?
   remarks            String?
 
-  // Relations to measurements
+  // 測定へのリレーション
   measurements Measurement[] @relation("PantsMeasurements")
 
-  // Relations
+  // リレーション
   button     HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
   fabric     HeavyFabricMaster?       @relation(fields: [fabricId], references: [id])
   options    OptionMaster?            @relation(fields: [optionsId], references: [id])
@@ -700,10 +665,10 @@ model VestDetails {
   bastedFitting               Boolean?
   remarks                     String?
 
-  // Relations to measurements
+  // 測定へのリレーション
   measurements Measurement[] @relation("VestMeasurements")
 
-  // Relations
+  // リレーション
   bodyLining                BodyLiningMaster?        @relation(fields: [bodyLiningId], references: [id])
   bodyLiningOrientationCode MCode?                   @relation("VestBodyLiningOrientationCode", fields: [bodyLiningOrientationCodeId], references: [id])
   button                    HeavyFabricButtonMaster? @relation(fields: [buttonId], references: [id])
