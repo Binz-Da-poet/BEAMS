@@ -40,15 +40,15 @@ export class AuthService {
       // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Mock users for development
-      const mockUsers: User[] = [
-        {
+      // Mock users for development (matching seed data from backend)
+      const mockUsers: { [key: string]: User } = {
+        'admin': {
           id: 1,
           name: 'Admin User',
           email: 'admin@beams.com',
           role: 'ADMIN',
         },
-        {
+        'store001': {
           id: 2,
           name: 'Store Manager',
           email: 'store@beams.com',
@@ -56,18 +56,29 @@ export class AuthService {
           storeId: 1,
           storeName: 'FPT Store',
         },
-        {
+        'factory001': {
           id: 3,
           name: 'Factory Staff',
           email: 'factory@beams.com',
           role: 'FACTORY_STAFF',
         },
-      ];
+      };
 
-      const user = mockUsers.find((u) => u.email === credentials.email);
+      const user = mockUsers[credentials.username];
 
       if (!user) {
-        throw new Error('Invalid credentials');
+        throw new Error('Invalid username or password');
+      }
+
+      // Simple password check (for demo - in production use bcrypt)
+      const validPasswords: { [key: string]: string } = {
+        'admin': 'ADMIN',
+        'store001': '1111',
+        'factory001': '1111',
+      };
+
+      if (validPasswords[credentials.username] !== credentials.password) {
+        throw new Error('Invalid username or password');
       }
 
       // Store mock token and user

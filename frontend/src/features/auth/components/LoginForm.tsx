@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth.context';
-import { UserRole } from '../auth.types';
 
 const LoginForm: React.FC = () => {
   const { login, isLoading, error } = useAuth();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
-    role: '店舗' as UserRole,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -15,19 +13,13 @@ const LoginForm: React.FC = () => {
     await login(formData);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
-
-  const roleOptions: { value: UserRole; label: string }[] = [
-    { value: '店舗', label: '店舗 (Cửa hàng)' },
-    { value: '店員', label: '店員 (Nhân viên)' },
-    { value: 'admin', label: 'Admin' },
-  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -37,45 +29,25 @@ const LoginForm: React.FC = () => {
             <img src="/assets/images/beams-logo.svg" alt="BEAMS" className="h-12" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Đăng nhập hệ thống</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">Chọn role và nhập thông tin đăng nhập</p>
+          <p className="mt-2 text-center text-sm text-gray-600">Nhập username và mật khẩu để đăng nhập</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                required
-              >
-                {roleOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Username
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
                 required
-                value={formData.email}
+                value={formData.username}
                 onChange={handleChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Nhập email"
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Nhập username"
               />
             </div>
 
@@ -91,7 +63,7 @@ const LoginForm: React.FC = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Nhập mật khẩu"
               />
             </div>
@@ -119,19 +91,25 @@ const LoginForm: React.FC = () => {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Thông tin đăng nhập mẫu</span>
+                <span className="px-2 bg-gray-50 text-gray-500">Tài khoản demo</span>
               </div>
             </div>
 
-            <div className="mt-4 text-xs text-gray-500 space-y-1">
-              <div>
-                <strong>Admin:</strong> admin@beams.com / (mật khẩu bất kỳ)
+            <div className="mt-4 text-xs text-gray-500 space-y-2">
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="font-semibold text-blue-700 mb-1">Admin</div>
+                <div>Username: <code className="bg-white px-2 py-0.5 rounded">admin</code></div>
+                <div>Password: <code className="bg-white px-2 py-0.5 rounded">ADMIN</code></div>
               </div>
-              <div>
-                <strong>店舗:</strong> store@beams.com / (mật khẩu bất kỳ)
+              <div className="bg-green-50 p-3 rounded">
+                <div className="font-semibold text-green-700 mb-1">Store (Cửa hàng)</div>
+                <div>Username: <code className="bg-white px-2 py-0.5 rounded">store001</code></div>
+                <div>Password: <code className="bg-white px-2 py-0.5 rounded">1111</code></div>
               </div>
-              <div>
-                <strong>店員:</strong> staff@beams.com / (mật khẩu bất kỳ)
+              <div className="bg-purple-50 p-3 rounded">
+                <div className="font-semibold text-purple-700 mb-1">Factory Staff</div>
+                <div>Username: <code className="bg-white px-2 py-0.5 rounded">factory001</code></div>
+                <div>Password: <code className="bg-white px-2 py-0.5 rounded">1111</code></div>
               </div>
             </div>
           </div>

@@ -58,14 +58,9 @@ const AdminDashboardPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Welcome back, {user?.name || 'Admin'}
-              </p>
+              <p className="mt-1 text-sm text-gray-600">Welcome back, {user?.name || 'Admin'}</p>
             </div>
-            <Link
-              to="/"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-            >
+            <Link to="/" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
               ← Back to Home
             </Link>
           </div>
@@ -122,19 +117,13 @@ const AdminDashboardPage: React.FC = () => {
         {/* Menu Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 group"
-            >
+            <Link key={item.path} to={item.path} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 group">
               <div className="flex items-start">
                 <div className={`${item.color} rounded-lg p-3 group-hover:scale-110 transition-transform`}>
                   <span className="text-3xl">{item.icon}</span>
                 </div>
                 <div className="ml-4 flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">
-                    {item.title}
-                  </h3>
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">{item.title}</h3>
                   <p className="mt-1 text-sm text-gray-600">{item.description}</p>
                 </div>
               </div>
@@ -156,9 +145,7 @@ const AdminDashboardPage: React.FC = () => {
                 { action: 'Pattern modified', user: 'Admin', time: '2 days ago', type: 'update' },
               ].map((activity, index) => (
                 <div key={index} className="flex items-center py-3 border-b border-gray-100 last:border-0">
-                  <div className={`w-2 h-2 rounded-full mr-3 ${
-                    activity.type === 'create' ? 'bg-green-500' : 'bg-blue-500'
-                  }`} />
+                  <div className={`w-2 h-2 rounded-full mr-3 ${activity.type === 'create' ? 'bg-green-500' : 'bg-blue-500'}`} />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{activity.action}</p>
                     <p className="text-xs text-gray-500">by {activity.user}</p>
@@ -175,4 +162,3 @@ const AdminDashboardPage: React.FC = () => {
 };
 
 export default AdminDashboardPage;
-

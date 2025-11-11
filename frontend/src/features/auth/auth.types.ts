@@ -1,19 +1,18 @@
-export type UserRole = '店舗' | '店員' | 'admin';
+export type UserRole = 'ADMIN' | 'STORE' | 'FACTORY_STAFF';
 
 export interface User {
   id: number;
   name: string;
   email?: string;
   phone?: string;
-  role: UserRole;
+  role: UserRole | string;
   storeId?: number;
   storeName?: string;
 }
 
 export interface LoginCredentials {
-  email: string;
+  username: string;
   password: string;
-  role: UserRole;
 }
 
 export interface AuthState {
