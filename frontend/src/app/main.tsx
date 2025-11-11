@@ -10,6 +10,7 @@ import { CustomerInfoPage, CustomerConfirmationPage } from '../features/customer
 import { CompletePage, DraftsPage } from '../features/shared';
 import LoginPage from '../features/auth/pages/LoginPage';
 import { DashboardPage } from '../features/dashboard';
+import { AdminDashboardPage, StaffManagementPage, StoreManagementPage, DatabaseManagementPage } from '../features/admin';
 
 const router = createBrowserRouter([
   {
@@ -37,6 +38,11 @@ const router = createBrowserRouter([
       { path: 'customer-info-confirmation', element: <CustomerConfirmationPage /> },
       { path: 'complete', element: <CompletePage /> },
       { path: 'drafts', element: <DraftsPage /> },
+      // Admin Routes
+      { path: 'admin', element: <AdminDashboardPage /> },
+      { path: 'admin/staff', element: <StaffManagementPage /> },
+      { path: 'admin/stores', element: <StoreManagementPage /> },
+      { path: 'admin/database', element: <DatabaseManagementPage /> },
     ],
   },
 ]);
