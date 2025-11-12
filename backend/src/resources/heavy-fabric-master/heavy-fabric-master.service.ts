@@ -30,7 +30,7 @@ export class HeavyFabricMasterService {
 
   async findByFabricNo(fabricNo: string): Promise<HeavyFabricMaster | null> {
     return this.prisma.heavyFabricMaster.findUnique({
-      where: { fabricNo },
+      where: { fabric_no: fabricNo },
       include: {
         supplier: true,
       },
@@ -65,7 +65,7 @@ export class HeavyFabricMasterService {
   async search(query: string): Promise<HeavyFabricMaster[]> {
     return this.prisma.heavyFabricMaster.findMany({
       where: {
-        OR: [{ fabricNo: { contains: query } }, { fabricManufacturer: { contains: query } }, { color: { contains: query } }, { fabricPattern: { contains: query } }, { composition: { contains: query } }],
+        OR: [{ fabric_no: { contains: query } }, { fabric_manufacturer: { contains: query } }, { color: { contains: query } }, { fabric_pattern: { contains: query } }, { composition: { contains: query } }],
       },
       include: {
         supplier: true,

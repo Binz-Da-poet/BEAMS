@@ -1,4 +1,6 @@
-export type UserRole = 'ADMIN' | 'STORE' | 'FACTORY_STAFF';
+import type { PrismaUserRole } from '@/types/prisma-types';
+
+export type UserRole = PrismaUserRole;
 
 export interface User {
   id: number;

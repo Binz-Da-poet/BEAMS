@@ -13,82 +13,9 @@ async function main() {
     const { seedMCodes } = await import('./seed-m-codes');
     await seedMCodes();
   }
-  // ===== 注文ステータスを作成 =====
-  console.log('📊 Creating order statuses...');
-  const orderStatuses = await Promise.all([
-    prisma.orderStatus.upsert({
-      where: { code: 'DRAFT' },
-      update: {},
-      create: {
-        name: '下書き',
-        code: 'DRAFT',
-        description: '下書き状態',
-        sortOrder: 1,
-        color: '#6B7280',
-        isActive: true,
-      },
-    }),
-    prisma.orderStatus.upsert({
-      where: { code: 'PENDING' },
-      update: {},
-      create: {
-        name: '受付済み',
-        code: 'PENDING',
-        description: '受付完了、確認待ち',
-        sortOrder: 2,
-        color: '#F59E0B',
-        isActive: true,
-      },
-    }),
-    prisma.orderStatus.upsert({
-      where: { code: 'CONFIRMED' },
-      update: {},
-      create: {
-        name: '確認済み',
-        code: 'CONFIRMED',
-        description: '工場確認完了',
-        sortOrder: 3,
-        color: '#3B82F6',
-        isActive: true,
-      },
-    }),
-    prisma.orderStatus.upsert({
-      where: { code: 'IN_PROGRESS' },
-      update: {},
-      create: {
-        name: '製作中',
-        code: 'IN_PROGRESS',
-        description: '製作進行中',
-        sortOrder: 4,
-        color: '#8B5CF6',
-        isActive: true,
-      },
-    }),
-    prisma.orderStatus.upsert({
-      where: { code: 'COMPLETED' },
-      update: {},
-      create: {
-        name: '完成',
-        code: 'COMPLETED',
-        description: '製作完了',
-        sortOrder: 5,
-        color: '#10B981',
-        isActive: true,
-      },
-    }),
-    prisma.orderStatus.upsert({
-      where: { code: 'DELIVERED' },
-      update: {},
-      create: {
-        name: '配送済み',
-        code: 'DELIVERED',
-        description: 'お客様にお届け完了',
-        sortOrder: 6,
-        color: '#059669',
-        isActive: true,
-      },
-    }),
-  ]);
+  // ===== 注文ステータスを作成 ===== (Moved to MCode - skipping)
+  console.log('⏭️  Skipping order statuses (moved to MCode)...');
+  const orderStatuses: any[] = [];
 
   // ===== 店舗を作成 =====
   console.log('📦 Creating stores...');
@@ -137,6 +64,42 @@ async function main() {
     }),
   ]);
 
+  // ===== 店舗スタッフを作成 =====
+  console.log('🧑‍💼 Creating store staff...');
+  await prisma.staffOfStore.deleteMany({});
+  await prisma.staffOfStore.createMany({
+    data: [
+      {
+        name: '佐藤 健',
+        phone: '03-3354-0001',
+        email: 'sato.ken@beams.co.jp',
+        role: '店長',
+        storeId: stores[0].id,
+      },
+      {
+        name: '高橋 美咲',
+        phone: '03-3354-0002',
+        email: 'takahashi.misaki@beams.co.jp',
+        role: 'スタイリスト',
+        storeId: stores[0].id,
+      },
+      {
+        name: '田中 潤',
+        phone: '03-3461-1001',
+        email: 'tanaka.jun@beams.co.jp',
+        role: 'アシスタント',
+        storeId: stores[1].id,
+      },
+      {
+        name: '中村 里奈',
+        phone: '06-1234-0001',
+        email: 'nakamura.rina@beams.co.jp',
+        role: '店長',
+        storeId: stores[2].id,
+      },
+    ],
+  });
+
   // ===== ユーザーを作成 =====
   console.log('👥 Creating users...');
   const hashedPasswordStore = await bcrypt.hash('1111', 10);
@@ -146,92 +109,43 @@ async function main() {
   const users = await Promise.all([
     // 店舗ユーザー: ユーザー名 "001", パスワード "1111"
     prisma.user.upsert({
-      where: { username: '001' },
+      where: { username: 'store001' },
       update: {},
       create: {
-        username: '001',
+        username: 'store001',
         password: hashedPasswordStore,
-        email: 'store@beams.co.jp',
-        phone: '03-3354-1234',
         role: 'STORE' as any,
         storeId: stores[0].id,
         isActive: true,
       },
     }),
-    // 工場ユーザー: ユーザー名 "123", パスワード "1111"
+    // 工場ユーザー: ユーザー名 "factory001", パスワード "1111"
     prisma.user.upsert({
-      where: { username: '123' },
+      where: { username: 'factory001' },
       update: {},
       create: {
-        username: '123',
+        username: 'factory001',
         password: hashedPasswordFactory,
-        email: 'factory@beams.co.jp',
-        phone: '03-9876-5432',
         role: 'FACTORY_STAFF' as any,
         isActive: true,
       },
     }),
-    // 管理者ユーザー: ユーザー名 "ADMIN", パスワード "ADMIN"
+    // 管理者ユーザー: ユーザー名 "admin", パスワード "ADMIN"
     prisma.user.upsert({
-      where: { username: 'ADMIN' },
+      where: { username: 'admin' },
       update: {},
       create: {
-        username: 'ADMIN',
+        username: 'admin',
         password: hashedPasswordAdmin,
-        email: 'admin@beams.co.jp',
-        phone: '03-1234-5678',
         role: 'ADMIN' as any,
         isActive: true,
       },
     }),
   ]);
 
-  // ===== 顧客を作成 =====
-  console.log('👤 Creating customers...');
-  const customers = await Promise.all([
-    prisma.customer.upsert({
-      where: { customerCode: 'CUST001' },
-      update: {},
-      create: {
-        name: '山田太郎',
-        kana: 'ヤマダタロウ',
-        phone: '090-1234-5678',
-        email: 'yamada@example.com',
-        customerCode: 'CUST001',
-        address: '東京都渋谷区恵比寿1-1-1',
-        birthDate: new Date('1985-05-15'),
-        isActive: true,
-      },
-    }),
-    prisma.customer.upsert({
-      where: { customerCode: 'CUST002' },
-      update: {},
-      create: {
-        name: '佐藤花子',
-        kana: 'サトウハナコ',
-        phone: '090-2345-6789',
-        email: 'sato@example.com',
-        customerCode: 'CUST002',
-        address: '東京都新宿区西新宿2-2-2',
-        birthDate: new Date('1990-08-20'),
-        isActive: true,
-      },
-    }),
-    prisma.customer.upsert({
-      where: { customerCode: 'CUST003' },
-      update: {},
-      create: {
-        name: '田中次郎',
-        kana: 'タナカジロウ',
-        phone: '090-3456-7890',
-        email: 'tanaka@example.com',
-        customerCode: 'CUST003',
-        address: '大阪府大阪市北区梅田3-3-3',
-        birthDate: new Date('1988-12-10'),
-        isActive: true,
-      },
-    }),
-  ]);
+  // ===== 顧客を作成 ===== (Customer model not in schema - skipping for now)
+  console.log('⏭️  Skipping customers (Customer model not found)...');
+  const customers: any[] = [];
 
   // ===== MCode lookups =====
   const planCodeMap = Object.fromEntries(
@@ -323,44 +237,44 @@ async function main() {
   console.log('🧵 Creating heavy fabric masters...');
   const fabrics = await Promise.all([
     prisma.heavyFabricMaster.upsert({
-      where: { fabricNo: 'FAB001' },
+      where: { fabric_no: 'FAB001' },
       update: {},
       create: {
-        fabricNo: 'FAB001',
-        fabricManufacturer: 'サンプルメーカー1',
+        fabric_no: 'FAB001',
+        fabric_manufacturer: 'サンプルメーカー1',
         color: 'ネイビー',
-        fabricPattern: '無地',
+        fabric_pattern: '無地',
         composition: 'ウール100%',
-        fabricProperties: '高級感のある質感',
-        fairFabricPrice: 15000,
-        fairFabricRank: 'A',
-        regularFabricPrice: 12000,
-        regularFabricRank: 'B',
-        fabricDataUpdate: new Date(),
+        fabric_properties: '高級感のある質感',
+        fair_fabric_price: 15000,
+        fair_fabric_rank: 'A',
+        regular_fabric_price: 12000,
+        regular_fabric_rank: 'B',
+        fabric_data_update: new Date(),
         large: false,
-        fabricSheer: false,
-        stockFlag: true,
+        fabric_sheer: false,
+        stock_flag: true,
         supplierId: suppliers[0].id,
       },
     }),
     prisma.heavyFabricMaster.upsert({
-      where: { fabricNo: 'FAB002' },
+      where: { fabric_no: 'FAB002' },
       update: {},
       create: {
-        fabricNo: 'FAB002',
-        fabricManufacturer: 'サンプルメーカー1',
+        fabric_no: 'FAB002',
+        fabric_manufacturer: 'サンプルメーカー1',
         color: 'グレー',
-        fabricPattern: 'ストライプ',
+        fabric_pattern: 'ストライプ',
         composition: 'ウール80% ポリエステル20%',
-        fabricProperties: 'しわになりにくい',
-        fairFabricPrice: 12000,
-        fairFabricRank: 'B',
-        regularFabricPrice: 10000,
-        regularFabricRank: 'C',
-        fabricDataUpdate: new Date(),
+        fabric_properties: 'しわになりにくい',
+        fair_fabric_price: 12000,
+        fair_fabric_rank: 'B',
+        regular_fabric_price: 10000,
+        regular_fabric_rank: 'C',
+        fabric_data_update: new Date(),
         large: false,
-        fabricSheer: false,
-        stockFlag: true,
+        fabric_sheer: false,
+        stock_flag: true,
         supplierId: suppliers[0].id,
       },
     }),
@@ -547,14 +461,17 @@ async function main() {
   }, {});
 
   // ===== 生地とパターンのIDを取得 =====
-  const fabric1 = await prisma.heavyFabricMaster.findUnique({ where: { fabricNo: 'FAB-001' } });
-  const fabric2 = await prisma.heavyFabricMaster.findUnique({ where: { fabricNo: 'FAB-002' } });
+  const fabric1 = await prisma.heavyFabricMaster.findUnique({ where: { fabric_no: 'FAB001' } });
+  const fabric2 = await prisma.heavyFabricMaster.findUnique({ where: { fabric_no: 'FAB002' } });
   const pattern1 = await prisma.patternMaster.findUnique({ where: { patternNo: 'JKT001' } });
   const pattern2 = await prisma.patternMaster.findUnique({ where: { patternNo: 'SUIT001' } });
   const pattern3 = await prisma.patternMaster.findUnique({ where: { patternNo: 'PANTS001' } });
 
-  // ===== サンプル注文を作成 =====
-  console.log('📦 Creating sample orders...');
+  // ===== サンプル注文を作成 ===== (Skipping - depends on customers)
+  console.log('⏭️  Skipping sample orders (depends on customers)...');
+  const orders: any[] = [];
+
+  /* COMMENTED OUT - depends on customers and orderStatuses
   const orders = await Promise.all([
     prisma.order.create({
       data: {
@@ -622,6 +539,7 @@ async function main() {
       } as any,
     }),
   ]);
+  */ // END COMMENTED OUT
 
   // ===== 通知タイプのIDを取得 =====
   const notificationTypes = await prisma.mCode.findMany({
@@ -632,8 +550,10 @@ async function main() {
     return acc;
   }, {});
 
-  // ===== サンプル通知を作成 =====
-  console.log('🔔 Creating sample notifications...');
+  // ===== サンプル通知を作成 ===== (Skipping - depends on orders)
+  console.log('⏭️  Skipping notifications (depends on orders)...');
+
+  /* COMMENTED OUT - depends on orders
   await Promise.all([
     prisma.notification.create({
       data: {
@@ -660,9 +580,12 @@ async function main() {
       },
     }),
   ]);
+  */ // END COMMENTED OUT
 
-  // ===== サンプル注文ログを作成 =====
-  console.log('📝 Creating sample order logs...');
+  // ===== サンプル注文ログを作成 ===== (Skipping - depends on orders)
+  console.log('⏭️  Skipping order logs (depends on orders)...');
+
+  /* COMMENTED OUT - depends on orders
   await Promise.all([
     prisma.orderLog.create({
       data: {
@@ -693,13 +616,12 @@ async function main() {
       },
     }),
   ]);
+  */ // END COMMENTED OUT
 
   console.log('✅ Unified seed completed successfully!');
   console.log(`📊 Created:`);
-  console.log(`   - ${orderStatuses.length} order statuses`);
   console.log(`   - ${stores.length} stores`);
   console.log(`   - ${users.length} users`);
-  console.log(`   - ${customers.length} customers`);
   console.log(`   - ${Object.keys(planCodeMap).length} plan codes (MCode)`);
   console.log(`   - ${Object.keys(itemTypeCodeMap).length} item type codes (MCode)`);
   console.log(`   - ${Object.keys(pickupMethodCodeMap).length} pickup method codes (MCode)`);
@@ -710,9 +632,6 @@ async function main() {
   console.log(`   - 2 lining masters`);
   console.log(`   - 1 button master`);
   console.log(`   - 1 option master`);
-  console.log(`   - ${orders.length} orders`);
-  console.log(`   - 2 notifications`);
-  console.log(`   - 2 order logs`);
 }
 
 main()

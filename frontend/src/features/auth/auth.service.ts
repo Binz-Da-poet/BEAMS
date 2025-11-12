@@ -1,113 +1,68 @@
-import { User, LoginCredentials } from './auth.types';
+import { User, LoginCredentials, UserRole } from './auth.types';
 import { HttpClient } from '@/services/http';
 import { ENV } from '@/config/env';
 
 const httpClient = new HttpClient({ baseUrl: ENV.API_BASE_URL });
 
 const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+const TOKEN_EXPIRES_AT_KEY = 'auth_token_expires_at';
 const USER_KEY = 'user';
+const EXPIRY_BUFFER_MS = 10_000; // refresh 10 seconds before expiry
 
-interface LoginResponse {
-  access_token: string;
-  user: {
+type BackendRole = 'ADMIN' | 'STORE' | 'FACTORY_STAFF';
+
+interface BackendUser {
+  id: number;
+  username: string;
+  email?: string | null;
+  role: BackendRole;
+  storeId?: number | null;
+  store?: {
     id: number;
-    username: string;
-    email?: string;
-    role: 'ADMIN' | 'STORE' | 'FACTORY_STAFF';
-    storeId?: number;
-    store?: {
-      id: number;
-      name: string;
-      code?: string;
-    };
-  };
+    name: string;
+    code?: string | null;
+  } | null;
+}
+
+interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: BackendUser;
 }
 
 export class AuthService {
+  private static refreshPromise: Promise<string> | null = null;
+
   /**
    * Login user with credentials
-   * TODO: Update endpoint when backend auth is implemented
+   * Validates against backend t_users table
    */
   static async login(credentials: LoginCredentials): Promise<User> {
     try {
-      // TODO: Replace with actual backend endpoint when auth is implemented
-      // const response = await httpClient.post<LoginResponse>('/auth/login', {
-      //   username: credentials.email, // or credentials.username
-      //   password: credentials.password,
-      // });
+      const response = await httpClient.post<AuthResponse>('/auth/login', {
+        username: credentials.username,
+        password: credentials.password,
+      });
 
-      // For now, use mock authentication
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock users for development (matching seed data from backend)
-      const mockUsers: { [key: string]: User } = {
-        'admin': {
-          id: 1,
-          name: 'Admin User',
-          email: 'admin@beams.com',
-          role: 'ADMIN',
-        },
-        'store001': {
-          id: 2,
-          name: 'Store Manager',
-          email: 'store@beams.com',
-          role: 'STORE',
-          storeId: 1,
-          storeName: 'FPT Store',
-        },
-        'factory001': {
-          id: 3,
-          name: 'Factory Staff',
-          email: 'factory@beams.com',
-          role: 'FACTORY_STAFF',
-        },
-      };
-
-      const user = mockUsers[credentials.username];
-
-      if (!user) {
-        throw new Error('Invalid username or password');
-      }
-
-      // Simple password check (for demo - in production use bcrypt)
-      const validPasswords: { [key: string]: string } = {
-        'admin': 'ADMIN',
-        'store001': '1111',
-        'factory001': '1111',
-      };
-
-      if (validPasswords[credentials.username] !== credentials.password) {
-        throw new Error('Invalid username or password');
-      }
-
-      // Store mock token and user
-      localStorage.setItem(TOKEN_KEY, 'mock-token-' + Date.now());
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      const user = this.transformUser(response.user);
+      this.persistSession(response, user);
 
       return user;
-
-      // When backend is ready, uncomment this:
-      // const { access_token, user: userData } = response;
-      //
-      // // Transform backend user to frontend User type
-      // const user: User = {
-      //   id: userData.id,
-      //   name: userData.username,
-      //   email: userData.email,
-      //   role: this.mapBackendRole(userData.role),
-      //   storeId: userData.storeId,
-      //   storeName: userData.store?.name,
-      // };
-      //
-      // // Store token and user
-      // localStorage.setItem(TOKEN_KEY, access_token);
-      // localStorage.setItem(USER_KEY, JSON.stringify(user));
-      //
-      // return user;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
-      throw new Error('Login failed. Please check your credentials.');
+
+      if (error.status === 401) {
+        throw new Error('ユーザー名またはパスワードが正しくありません');
+      }
+      if (error.status === 404) {
+        throw new Error('該当するユーザーが見つかりません');
+      }
+      if (error.status === 423) {
+        throw new Error('アカウントがロックされています。管理者にお問い合わせください。');
+      }
+      throw new Error('ログインに失敗しました。時間をおいて再度お試しください。');
     }
   }
 
@@ -118,15 +73,85 @@ export class AuthService {
     try {
       // TODO: Call backend logout endpoint when implemented
       // await httpClient.post('/auth/logout');
+    } finally {
+      this.refreshPromise = null;
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
+  }
 
-      // Clear local storage
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+  /**
+   * Attempt to restore session (refresh token if needed)
+   */
+  static async restoreSession(): Promise<User | null> {
+    const currentUser = this.getCurrentUser();
+    if (!currentUser) {
+      return null;
+    }
+
+    const token = await this.getValidAccessToken();
+    if (!token) {
+      await this.logout();
+      return null;
+    }
+
+    return this.getCurrentUser();
+  }
+
+  /**
+   * Refresh authentication token using stored refresh token
+   */
+  static async refreshToken(): Promise<string> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = (async () => {
+        try {
+          return await this.requestRefresh();
+        } finally {
+          this.refreshPromise = null;
+        }
+      })();
+    }
+    return this.refreshPromise;
+  }
+
+  private static async requestRefresh(): Promise<string> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await httpClient.post<AuthResponse>('/auth/refresh', {
+      refreshToken,
+    });
+
+    const user = this.transformUser(response.user);
+    this.persistSession(response, user);
+    return response.access_token;
+  }
+
+  /**
+   * Get a valid access token (refresh if necessary)
+   */
+  static async getValidAccessToken(): Promise<string | null> {
+    const token = this.getAccessToken();
+    if (!token) return null;
+
+    const expiresAt = this.getAccessTokenExpiresAt();
+    if (!expiresAt) return token;
+
+    const now = Date.now();
+    if (now < expiresAt - EXPIRY_BUFFER_MS) {
+      return token;
+    }
+
+    try {
+      return await this.refreshToken();
     } catch (error) {
-      console.error('Logout failed:', error);
-      // Clear storage anyway
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      console.error('Failed to refresh access token:', error);
+      await this.logout();
+      return null;
     }
   }
 
@@ -138,62 +163,89 @@ export class AuthService {
     if (!userStr) return null;
 
     try {
-      return JSON.parse(userStr);
+      return JSON.parse(userStr) as User;
     } catch {
       return null;
     }
   }
 
   /**
-   * Check if user is authenticated
+   * Check if user is authenticated synchronously (based on stored tokens)
    */
   static isAuthenticated(): boolean {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = this.getAccessToken();
     const user = this.getCurrentUser();
-    return !!token && !!user;
+    if (!token || !user) return false;
+
+    const expiresAt = this.getAccessTokenExpiresAt();
+    if (!expiresAt) return true;
+
+    return Date.now() < expiresAt;
   }
 
   /**
-   * Get authentication token
+   * Get raw access token without refresh logic
    */
-  static getToken(): string | null {
+  static getAccessToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
   }
 
   /**
-   * Map backend role to frontend role
-   * Backend: ADMIN, STORE, FACTORY_STAFF
-   * Frontend: admin, 店舗, 店員, etc.
+   * Get stored refresh token
    */
-  private static mapBackendRole(backendRole: 'ADMIN' | 'STORE' | 'FACTORY_STAFF'): string {
-    const roleMap: Record<string, string> = {
+  static getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+
+  static async handleUnauthorized(): Promise<boolean> {
+    try {
+      const token = await this.refreshToken();
+      return !!token;
+    } catch (error) {
+      console.error('Unable to refresh session after unauthorized response:', error);
+      await this.logout();
+      return false;
+    }
+  }
+
+  private static transformUser(user: BackendUser): User {
+    return {
+      id: user.id,
+      name: user.username,
+      email: user.email ?? undefined,
+      role: this.mapBackendRole(user.role),
+      storeId: user.storeId ?? undefined,
+      storeName: user.store?.name ?? undefined,
+    };
+  }
+
+  private static persistSession(payload: AuthResponse, user: User) {
+    localStorage.setItem(TOKEN_KEY, payload.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, payload.refresh_token);
+    localStorage.setItem(TOKEN_EXPIRES_AT_KEY, this.computeExpiryTimestamp(payload.expires_in).toString());
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+
+  private static computeExpiryTimestamp(expiresInSeconds: number): number {
+    if (!Number.isFinite(expiresInSeconds)) {
+      return Date.now() + 15 * 60 * 1000;
+    }
+    return Date.now() + expiresInSeconds * 1000;
+  }
+
+  private static getAccessTokenExpiresAt(): number | null {
+    const value = localStorage.getItem(TOKEN_EXPIRES_AT_KEY);
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private static mapBackendRole(backendRole: BackendRole): UserRole {
+    const roleMap: Record<BackendRole, UserRole> = {
       ADMIN: 'ADMIN',
       STORE: 'STORE',
       FACTORY_STAFF: 'FACTORY_STAFF',
     };
-    return roleMap[backendRole] || backendRole;
-  }
-
-  /**
-   * Refresh authentication token
-   * TODO: Implement when backend supports token refresh
-   */
-  static async refreshToken(): Promise<string> {
-    try {
-      // const response = await httpClient.post<{ access_token: string }>('/auth/refresh');
-      // const { access_token } = response;
-      // localStorage.setItem(TOKEN_KEY, access_token);
-      // return access_token;
-
-      // Mock implementation
-      const currentToken = this.getToken();
-      if (!currentToken) {
-        throw new Error('No token to refresh');
-      }
-      return currentToken;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      throw error;
-    }
+    return roleMap[backendRole] ?? backendRole;
   }
 }

@@ -12,6 +12,8 @@ export interface HttpRequestOptions<TBody = unknown> {
 export interface HttpClientOptions {
   baseUrl?: string;
   defaultHeaders?: HttpHeaders;
+  getAccessToken?: () => Promise<string | null> | string | null;
+  onUnauthorized?: (error: HttpError) => Promise<boolean> | boolean;
 }
 
 export class HttpError extends Error {
@@ -30,10 +32,14 @@ export class HttpError extends Error {
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly defaultHeaders: HttpHeaders;
+  private readonly getAccessTokenFn?: () => Promise<string | null> | string | null;
+  private readonly onUnauthorizedFn?: (error: HttpError) => Promise<boolean> | boolean;
 
   constructor(options: HttpClientOptions = {}) {
     this.baseUrl = (options.baseUrl || '').replace(/\/$/, '');
     this.defaultHeaders = Object.assign({ 'Content-Type': 'application/json' }, options.defaultHeaders || {});
+    this.getAccessTokenFn = options.getAccessToken;
+    this.onUnauthorizedFn = options.onUnauthorized;
   }
 
   private buildUrl(pathname: string): string {
@@ -42,11 +48,36 @@ export class HttpClient {
     return `${this.baseUrl}${path}`;
   }
 
-  async request<TResponse = unknown, TBody = unknown>(pathname: string, { method = 'GET', headers, body, signal }: HttpRequestOptions<TBody> = {}): Promise<TResponse> {
+  private async resolveAccessToken(): Promise<string | null> {
+    if (!this.getAccessTokenFn) {
+      return null;
+    }
+    try {
+      const tokenOrPromise = this.getAccessTokenFn();
+      if (typeof (tokenOrPromise as Promise<unknown>)?.then === 'function') {
+        return await (tokenOrPromise as Promise<string | null>);
+      }
+      return tokenOrPromise as string | null;
+    } catch {
+      return null;
+    }
+  }
+
+  async request<TResponse = unknown, TBody = unknown>(
+    pathname: string,
+    { method = 'GET', headers, body, signal }: HttpRequestOptions<TBody> = {},
+    hasRetried = false,
+  ): Promise<TResponse> {
     const url = this.buildUrl(pathname);
 
     const isJsonBody = body != null && typeof body !== 'string' && !(body instanceof FormData);
     const finalHeaders: HeadersInit = Object.assign({}, this.defaultHeaders, headers || {});
+
+    const token = await this.resolveAccessToken();
+    if (token) {
+      (finalHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
     const payload: BodyInit | undefined = isJsonBody ? JSON.stringify(body) : (body as unknown as BodyInit | undefined);
 
     const res = await fetch(url, { method, headers: finalHeaders, body: payload, signal });
@@ -58,7 +89,14 @@ export class HttpClient {
     } catch {}
 
     if (!res.ok) {
-      throw new HttpError(`Request failed: ${res.status}`, res.status, res.statusText, data);
+      const error = new HttpError(`Request failed: ${res.status}`, res.status, res.statusText, data);
+      if (!hasRetried && error.status === 401 && this.onUnauthorizedFn) {
+        const shouldRetry = await this.onUnauthorizedFn(error);
+        if (shouldRetry) {
+          return this.request<TResponse, TBody>(pathname, { method, headers, body, signal }, true);
+        }
+      }
+      throw error;
     }
     return data as TResponse;
   }

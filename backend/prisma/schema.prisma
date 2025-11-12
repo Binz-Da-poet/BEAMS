@@ -151,8 +151,6 @@ model Store {
 
   // 拡張フィールド
   isActive    Boolean   @default(true)
-  region      String?
-  managerName String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -172,6 +170,8 @@ model StaffOfStore {
   id      Int     @id @default(autoincrement())
   name    String
   phone   String?
+  email   String?
+  role    String?
   storeId Int
 
   // リレーション

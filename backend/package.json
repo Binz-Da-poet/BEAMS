@@ -12,6 +12,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint --ext .ts src",
     "prisma:generate": "prisma generate",
+    "generate:frontend-types": "ts-node scripts/generate-frontend-types.ts",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed"
@@ -22,6 +23,7 @@
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/jwt": "^10.2.0",
     "@nestjs/swagger": "^7.3.1",
     "@prisma/client": "^5.20.0",
     "@types/bcryptjs": "^2.4.6",

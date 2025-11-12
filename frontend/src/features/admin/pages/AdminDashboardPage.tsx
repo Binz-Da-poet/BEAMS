@@ -7,45 +7,45 @@ const AdminDashboardPage: React.FC = () => {
 
   const menuItems = [
     {
-      title: 'Staff Management',
-      description: 'Quản lý nhân viên và phân quyền',
+      title: 'スタッフ管理',
+      description: '店舗スタッフの登録・権限を管理します',
       icon: '👥',
       path: '/admin/staff',
       color: 'bg-blue-500',
     },
     {
-      title: 'Store Management',
-      description: 'Quản lý cửa hàng và thông tin',
+      title: '店舗管理',
+      description: '店舗情報・担当者・連絡先を管理します',
       icon: '🏪',
       path: '/admin/stores',
       color: 'bg-green-500',
     },
     {
-      title: 'Database Management',
-      description: 'Quản lý dữ liệu master tables',
+      title: 'マスタ管理',
+      description: '生地・型紙・付属品などのマスタ情報を管理します',
       icon: '🗄️',
       path: '/admin/database',
       color: 'bg-purple-500',
     },
     {
-      title: 'Heavy Fabric Master',
-      description: 'Quản lý thông tin vải',
+      title: '重衣料生地マスタ',
+      description: '仕入先・品番・価格情報を更新します',
       icon: '🧵',
       path: '/admin/database/fabrics',
       color: 'bg-indigo-500',
     },
     {
-      title: 'Pattern Master',
-      description: 'Quản lý mẫu thiết kế',
+      title: 'パターンマスタ',
+      description: 'サイズや仕様のマスタ情報を管理します',
       icon: '📐',
       path: '/admin/database/patterns',
       color: 'bg-pink-500',
     },
     {
-      title: 'Lining Master',
-      description: 'Quản lý lớp lót',
+      title: '裏地マスタ',
+      description: '胴裏・袖裏などの情報を管理します',
       icon: '🎨',
-      path: '/admin/database/linings',
+      path: '/admin/database/body-linings',
       color: 'bg-yellow-500',
     },
   ];
@@ -57,11 +57,11 @@ const AdminDashboardPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-600">Welcome back, {user?.name || 'Admin'}</p>
+              <h1 className="text-3xl font-bold text-gray-900">管理者ダッシュボード</h1>
+              <p className="mt-1 text-sm text-gray-600">お疲れさまです、{user?.name || '管理者'} さん</p>
             </div>
             <Link to="/" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
-              ← Back to Home
+              ← メニューに戻る
             </Link>
           </div>
         </div>
@@ -79,8 +79,8 @@ const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Staff</p>
-                <p className="text-2xl font-bold text-gray-900">24</p>
+                <p className="text-sm font-medium text-gray-600">登録スタッフ数</p>
+                <p className="text-2xl font-bold text-gray-900">24名</p>
               </div>
             </div>
           </div>
@@ -93,8 +93,8 @@ const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Stores</p>
-                <p className="text-2xl font-bold text-gray-900">8</p>
+                <p className="text-sm font-medium text-gray-600">登録店舗数</p>
+                <p className="text-2xl font-bold text-gray-900">8店舗</p>
               </div>
             </div>
           </div>
@@ -107,8 +107,8 @@ const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Master Records</p>
-                <p className="text-2xl font-bold text-gray-900">1,234</p>
+                <p className="text-sm font-medium text-gray-600">マスタ登録件数</p>
+                <p className="text-2xl font-bold text-gray-900">1,234件</p>
               </div>
             </div>
           </div>
@@ -134,21 +134,21 @@ const AdminDashboardPage: React.FC = () => {
         {/* Recent Activity */}
         <div className="mt-8 bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
+            <h2 className="text-xl font-semibold text-gray-900">最近の更新履歴</h2>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {[
-                { action: 'Staff created', user: 'Admin', time: '2 hours ago', type: 'create' },
-                { action: 'Store updated', user: 'Admin', time: '5 hours ago', type: 'update' },
-                { action: 'Fabric added', user: 'Admin', time: '1 day ago', type: 'create' },
-                { action: 'Pattern modified', user: 'Admin', time: '2 days ago', type: 'update' },
+                { action: 'スタッフを追加しました', user: '管理者', time: '2時間前', type: 'create' },
+                { action: '店舗情報を更新しました', user: '管理者', time: '5時間前', type: 'update' },
+                { action: '生地マスタを追加しました', user: '管理者', time: '1日前', type: 'create' },
+                { action: 'パターン情報を変更しました', user: '管理者', time: '2日前', type: 'update' },
               ].map((activity, index) => (
                 <div key={index} className="flex items-center py-3 border-b border-gray-100 last:border-0">
                   <div className={`w-2 h-2 rounded-full mr-3 ${activity.type === 'create' ? 'bg-green-500' : 'bg-blue-500'}`} />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                    <p className="text-xs text-gray-500">by {activity.user}</p>
+                    <p className="text-xs text-gray-500">更新者: {activity.user}</p>
                   </div>
                   <span className="text-xs text-gray-400">{activity.time}</span>
                 </div>

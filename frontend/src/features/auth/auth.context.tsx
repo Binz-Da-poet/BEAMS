@@ -67,11 +67,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const user = AuthService.getCurrentUser();
-    if (user && AuthService.isAuthenticated()) {
-      dispatch({ type: 'SET_USER', payload: user });
-    }
+    let isMounted = true;
+
+    const restore = async () => {
+      try {
+        const user = await AuthService.restoreSession();
+        if (isMounted) {
+          dispatch({ type: 'SET_USER', payload: user });
+        }
+      } catch (error) {
+        console.error('Failed to restore session:', error);
+        if (isMounted) {
+          dispatch({ type: 'SET_USER', payload: null });
+        }
+      }
+    };
+
+    restore();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (credentials: LoginCredentials) => {

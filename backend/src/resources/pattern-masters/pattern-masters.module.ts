@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { JacketPatternMasterModule } from '../jacket-pattern-master/jacket-pattern-master.module';
+import { PatternMastersService } from './pattern-masters.service';
+import { PatternMastersController } from './pattern-masters.controller';
 
 @Module({
-  imports: [PrismaModule, JacketPatternMasterModule],
-  exports: [JacketPatternMasterModule],
+  imports: [PrismaModule],
+  controllers: [PatternMastersController],
+  providers: [PatternMastersService],
+  exports: [PatternMastersService],
 })
 export class PatternMastersModule {}
